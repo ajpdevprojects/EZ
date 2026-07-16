@@ -23,6 +23,14 @@ const RESUME_PERFORMANCE_MIN_APPLICATIONS = 3;
 const RESUME_PERFORMANCE_MIN_RATE = 50;
 const FOLLOW_UP_DEDUPE_WINDOW_MS = 1000 * 60 * 60 * 24 * 3;
 const RESUME_ALERT_DEDUPE_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
+// Every user's briefing needs several sequential, per-user database round
+// trips (existing-briefing check, applications/resumes/interviews, then
+// per-match and per-resume dedup lookups). Run users in bounded-concurrency
+// batches instead of one at a time so this job's wall-clock time scales
+// with (userCount / BATCH_SIZE) instead of userCount — at maxDuration=120s,
+// a fully sequential loop starts silently failing to finish once the user
+// base reaches a few hundred people.
+const USER_BATCH_SIZE = 10;
 
 /**
  * Proactive Software Brain: runs once a day so the user opens EZ to
@@ -36,13 +44,16 @@ export async function GET(request: Request) {
   const authError = verifyCronRequest(request);
   if (authError) return authError;
 
-  const supabase = createServiceClient();
-  if (!supabase) {
+  const serviceClient = createServiceClient();
+  if (!serviceClient) {
     return NextResponse.json(
       { error: "SUPABASE_SERVICE_ROLE_KEY is not configured — the daily briefing job is disabled." },
       { status: 503 },
     );
   }
+  // Narrowed to a fresh binding: TypeScript's null-narrowing from the check
+  // above doesn't carry into the nested processUserBriefing() closure below.
+  const supabase = serviceClient;
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -66,10 +77,11 @@ export async function GET(request: Request) {
   const jobsDiscoveredGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_created, 0);
   const duplicatesRemovedGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_duplicates_removed, 0);
 
-  let briefingsCreated = 0;
-  let notificationsCreated = 0;
+  type ProfileRow = NonNullable<typeof profileRows>[number];
 
-  for (const profileRow of profileRows ?? []) {
+  async function processUserBriefing(
+    profileRow: ProfileRow,
+  ): Promise<{ briefingCreated: boolean; notificationsCreated: number }> {
     const profile = mapProfile(profileRow);
 
     const [
@@ -94,7 +106,7 @@ export async function GET(request: Request) {
       supabase.from("recruiter_emails").select("id", { count: "exact", head: true }).eq("user_id", profile.id).is("read_at", null),
     ]);
 
-    if (existingDailyBriefing) continue;
+    if (existingDailyBriefing) return { briefingCreated: false, notificationsCreated: 0 };
 
     const applications = (applicationRows ?? []).map((row) => {
       const { jobs: jobRow, ...applicationRow } = row as typeof row & { jobs: Parameters<typeof mapJob>[0] | null };
@@ -214,6 +226,7 @@ export async function GET(request: Request) {
       resumePerformanceAlerts,
     });
 
+    let notificationsCreated = 0;
     for (const notification of planned) {
       const { error } = await supabase.from("notifications").insert({
         user_id: profile.id,
@@ -225,8 +238,25 @@ export async function GET(request: Request) {
       if (!error) notificationsCreated++;
     }
 
-    briefingsCreated++;
+    return { briefingCreated: true, notificationsCreated };
   }
 
-  return NextResponse.json({ usersProcessed: profileRows?.length ?? 0, briefingsCreated, notificationsCreated });
+  // Bounded-concurrency batches: each user's own queries still run
+  // sequentially with respect to each other where the logic depends on it,
+  // but different users' work overlaps instead of queuing behind one
+  // another one at a time.
+  let briefingsCreated = 0;
+  let notificationsCreated = 0;
+  const rows = profileRows ?? [];
+
+  for (let i = 0; i < rows.length; i += USER_BATCH_SIZE) {
+    const batch = rows.slice(i, i + USER_BATCH_SIZE);
+    const results = await Promise.all(batch.map(processUserBriefing));
+    for (const result of results) {
+      if (result.briefingCreated) briefingsCreated++;
+      notificationsCreated += result.notificationsCreated;
+    }
+  }
+
+  return NextResponse.json({ usersProcessed: rows.length, briefingsCreated, notificationsCreated });
 }
