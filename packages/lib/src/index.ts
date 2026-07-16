@@ -1,4 +1,5 @@
 export * from "./analytics";
+export * from "./daily-briefing-generator";
 export * from "./ics";
 export * from "./ai/agent";
 export * from "./ai/generate";

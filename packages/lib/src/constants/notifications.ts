@@ -8,4 +8,6 @@ export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
   interview_reminder: "Interview reminder",
   offer_received: "Offer received",
   journey_completed: "Journey completed",
+  follow_up_recommended: "Follow-up recommended",
+  resume_performing_well: "Resume performing well",
 };

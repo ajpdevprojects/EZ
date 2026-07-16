@@ -18,6 +18,7 @@ import type { DailyBriefing, Profile } from "@ez/types";
 
 const DAILY_RECOMMENDATION_LIMIT = 15;
 const INTERVIEW_PREP_WINDOW_MS = 1000 * 60 * 60 * 48;
+const NEW_JOB_WINDOW_MS = 1000 * 60 * 60 * 24;
 
 export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promise<DailyBriefing> {
   if (isDemo) return getDemoDailyBriefing();
@@ -85,6 +86,10 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
     topOpportunityCount: recommended.filter((entry) => entry.match.score >= 60).length,
   });
 
+  const newOpportunitiesCount = recommended.filter(
+    (entry) => now.getTime() - new Date(entry.job.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
+  ).length;
+
   return {
     greetingName,
     applicationsInProgress,
@@ -96,5 +101,7 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
     dailyPriorities,
     unreadRecruiterEmailCount,
     upcomingInterviews,
+    newOpportunitiesCount,
+    staleApplicationCount,
   };
 }

@@ -54,6 +54,43 @@ deterministic signal processing:
   used; the Resume System page shows each resume's application count and
   interview rate so a user can see which version is actually working.
 
+### Proactive Software Brain ("already working" before you open the app)
+
+Per the Product Experience Directive, EZ should feel like it already did
+meaningful work before the user opens it — never an empty dashboard the
+user has to fill by acting first:
+
+- **`packages/lib/src/daily-briefing-generator.ts`** — the single source
+  of truth for the "Good morning, I've already..." story, used in two
+  places so it's never out of sync:
+  1. **Live on Home** (`MorningGreeting`) — computed fresh on every page
+     load from real current state (new opportunities since yesterday,
+     today's top match, upcoming interviews, stale follow-ups, unread
+     recruiter replies), so the proactive feeling is present immediately
+     even before any background job has ever run.
+  2. **`apps/web/app/api/cron/daily-briefing`** — a once-daily background
+     job (service-role client, `CRON_SECRET`-guarded, scheduled 6am via
+     `apps/web/vercel.json`) that persists the same story as a
+     `daily_briefing` notification for every user, plus proactive
+     `new_opportunity` (newly-discovered high-confidence jobs),
+     `follow_up_recommended` (stale applications), and
+     `resume_performing_well` (a resume crossing a real interview-rate
+     threshold) notifications. Every notification is idempotent — dedup
+     keyed by job id, by day, or by a cooldown window — so the job is
+     safe to run on every scheduled tick without ever repeating itself or
+     becoming noise.
+- **Honesty by construction** — the generator never fabricates a
+  highlight: an empty state ("Everything is quiet right now") is used
+  whenever there's genuinely nothing to report, never a manufactured
+  sense of urgency. This mirrors the Product Philosophy's "recommendations
+  should be earned... never manipulated."
+- **Not built**: "company viewed your application" — EZ does not fabricate
+  this signal. No integration in this build actually observes ATS/recruiter
+  view activity, and inventing that notification would violate the
+  Product Philosophy's honesty principle. The `recruiter_viewed` journey
+  milestone type already exists in the schema, ready for a real signal
+  source if one is ever integrated.
+
 ### Mission Control (Home)
 
 Home answers "what should I work on today?" instead of showing
@@ -182,8 +219,9 @@ demo-able end to end.
 - **Learning Hub** (`/learning`) — resource catalog + progress tracking.
 - **Notifications** (`/notifications`) — bell + unread count, created
   automatically by application, interview, and recruiter-email events,
-  plus a scheduled interview-reminder background job
-  (`apps/web/app/api/cron/interview-reminders`, hourly).
+  plus three scheduled background jobs: interview reminders (hourly),
+  and the daily briefing job's new-opportunity / follow-up / resume-
+  performance / daily-summary notifications (once daily).
 - **Analytics** (`/analytics`) — pipeline counts, response rate, accessible
   bar charts.
 - **Company Workspace** (`/companies`) — derived view grouping
@@ -194,18 +232,20 @@ demo-able end to end.
 
 ### Tests
 
-- **143 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
+- **154 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
   (Vitest) covering validation, journey logic, analytics, ICS generation,
   AI prompt/response parsing, job discovery (sources, normalize, dedupe,
   ingest orchestration), confidence scoring, behavioral learning, mission
-  control priorities, resume performance, skill-gap analysis, email
-  categorization, cron auth, and UI primitives/components.
-- **24 Playwright e2e tests** (`apps/web/e2e`) against a production build
+  control priorities, the daily briefing generator (summary + notification
+  planning), resume performance, skill-gap analysis, email categorization,
+  cron auth, and UI primitives/components.
+- **25 Playwright e2e tests** (`apps/web/e2e`) against a production build
   in demo mode — the full golden path plus every feature screen: resumes
   (with performance stats), interviews, coach, journey, learning,
   documents, inbox, notifications, analytics, integrations, company
-  workspace, Mission Control priorities, confidence-scored recommendations
-  + dismissal, job match analysis + skill-gap, and profile navigation.
+  workspace, the proactive morning greeting, Mission Control priorities,
+  confidence-scored recommendations + dismissal, job match analysis +
+  skill-gap, and profile navigation.
 - GitHub Actions CI runs lint, typecheck, unit tests, build, and e2e on
   every push/PR.
 
@@ -220,8 +260,9 @@ complete and degrades gracefully without them.
   `GOOGLE_GENERATIVE_AI_API_KEY`. Every AI feature degrades to a friendly
   "not configured" message without it — nothing breaks.
 - **Background jobs** — `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` to
-  enable job ingestion and interview reminders; deploying to Vercel picks
-  up `apps/web/vercel.json`'s schedules automatically once those are set.
+  enable job ingestion, interview reminders, and the daily briefing job;
+  deploying to Vercel picks up `apps/web/vercel.json`'s three schedules
+  automatically once those are set.
 
 ## Externally blocked (cannot be completed inside this repository)
 

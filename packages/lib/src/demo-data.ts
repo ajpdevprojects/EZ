@@ -639,6 +639,7 @@ export function createEmptyDemoResume(title: string): Resume {
 
 const DAILY_RECOMMENDATION_LIMIT = 15;
 const INTERVIEW_PREP_WINDOW_MS = 1000 * 60 * 60 * 48;
+const NEW_JOB_WINDOW_MS = 1000 * 60 * 60 * 24;
 
 export function getDemoDailyBriefing(): DailyBriefing {
   const now = new Date();
@@ -682,6 +683,10 @@ export function getDemoDailyBriefing(): DailyBriefing {
     topOpportunityCount: recommended.filter((entry) => entry.match.score >= 60).length,
   });
 
+  const newOpportunitiesCount = recommended.filter(
+    (entry) => now.getTime() - new Date(entry.job.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
+  ).length;
+
   return {
     greetingName: DEMO_PROFILE.fullName ?? "there",
     applicationsInProgress,
@@ -693,5 +698,7 @@ export function getDemoDailyBriefing(): DailyBriefing {
     dailyPriorities,
     unreadRecruiterEmailCount,
     upcomingInterviews,
+    newOpportunitiesCount,
+    staleApplicationCount,
   };
 }

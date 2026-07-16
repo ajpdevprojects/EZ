@@ -164,6 +164,8 @@ export interface DailyBriefing {
   dailyPriorities: DailyPriorityItem[];
   unreadRecruiterEmailCount: number;
   upcomingInterviews: UpcomingInterviewSummary[];
+  newOpportunitiesCount: number;
+  staleApplicationCount: number;
 }
 
 // ---------------------------------------------------------------------
@@ -284,7 +286,9 @@ export type NotificationType =
   | "interview_scheduled"
   | "interview_reminder"
   | "offer_received"
-  | "journey_completed";
+  | "journey_completed"
+  | "follow_up_recommended"
+  | "resume_performing_well";
 
 export interface Notification {
   id: string;

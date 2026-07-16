@@ -7,6 +7,12 @@ test.describe("Job Search Operating System features (demo mode)", () => {
     await expect(page.getByText(/% match/).first()).toBeVisible();
   });
 
+  test("home greets the user with what the Software Brain already did", async ({ page }) => {
+    await page.goto("/home");
+    await expect(page.getByText(/Good morning, Alex\./)).toBeVisible();
+    await expect(page.getByText(/Your top match today is/)).toBeVisible();
+  });
+
   test("home surfaces today's priorities", async ({ page }) => {
     await page.goto("/home");
     await expect(page.getByText("Today's priorities")).toBeVisible();

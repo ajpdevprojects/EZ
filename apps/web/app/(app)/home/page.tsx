@@ -1,4 +1,5 @@
 import { DailyPriorities } from "@/features/home/components/daily-priorities";
+import { MorningGreeting } from "@/features/home/components/morning-greeting";
 import { OpportunityList } from "@/features/home/components/opportunity-list";
 import { QuickLinks } from "@/features/home/components/quick-links";
 import { getCurrentSession } from "@/lib/session";
@@ -12,6 +13,14 @@ export default async function HomePage() {
   if (!session) redirect("/sign-in");
 
   const briefing = await getDailyBriefing(session.profile, session.isDemo);
+  const topJob = briefing.recommendedJobs[0];
+  const topOpportunity = topJob
+    ? {
+        title: topJob.title,
+        company: topJob.company,
+        score: briefing.recommendedMatches[topJob.id]?.score ?? 0,
+      }
+    : null;
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-6 py-8">
@@ -21,6 +30,15 @@ export default async function HomePage() {
           {briefing.greetingName}
         </h1>
       </header>
+
+      <MorningGreeting
+        greetingName={briefing.greetingName.split(" ")[0]}
+        newOpportunitiesCount={briefing.newOpportunitiesCount}
+        topOpportunity={topOpportunity}
+        upcomingInterviewCount={briefing.upcomingInterviews.length}
+        staleApplicationCount={briefing.staleApplicationCount}
+        unreadRecruiterEmailCount={briefing.unreadRecruiterEmailCount}
+      />
 
       <div className="flex gap-3">
         <StatTile label="Applications" value={briefing.applicationsInProgress} />
