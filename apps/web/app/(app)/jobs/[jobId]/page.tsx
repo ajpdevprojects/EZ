@@ -1,18 +1,28 @@
+import { getApplicationForJob } from "@/features/applications/data";
+import { TailorCoverLetterButton } from "@/features/documents/components/tailor-cover-letter-button";
 import { ApplyButton } from "@/features/jobs/components/apply-button";
+import { JobMatchAnalysisCard } from "@/features/jobs/components/job-match-analysis";
 import { getJobById } from "@/features/jobs/data";
 import { EMPLOYMENT_TYPE_LABEL, SENIORITY_LABEL } from "@/features/jobs/labels";
+import { getCurrentSession } from "@/lib/session";
 import { formatSalaryRange } from "@ez/lib";
 import { Badge } from "@ez/ui";
 import { Briefcase, MapPin } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export default async function JobDetailsPage({
   params,
 }: {
   params: Promise<{ jobId: string }>;
 }) {
+  const session = await getCurrentSession();
+  if (!session) redirect("/sign-in");
+
   const { jobId } = await params;
-  const job = await getJobById(jobId);
+  const [job, application] = await Promise.all([
+    getJobById(jobId),
+    getApplicationForJob(session.profile.id, jobId, session.isDemo),
+  ]);
 
   if (!job) notFound();
 
@@ -41,6 +51,12 @@ export default async function JobDetailsPage({
         {salary && <Badge variant="new">{salary}</Badge>}
       </div>
 
+      <JobMatchAnalysisCard
+        jobId={job.id}
+        initialScore={application?.matchScore ?? null}
+        initialReason={application?.matchReason ?? null}
+      />
+
       <section className="flex flex-col gap-2">
         <h2 className="font-display text-lg font-semibold text-foreground">Overview</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">{job.description}</p>
@@ -59,8 +75,11 @@ export default async function JobDetailsPage({
         </section>
       )}
 
-      <div className="mt-4">
-        <ApplyButton jobId={job.id} />
+      <div className="mt-4 flex flex-col gap-3">
+        <ApplyButton jobId={job.id} initiallyApplied={Boolean(application && application.status !== "saved")} />
+        {application && (
+          <TailorCoverLetterButton applicationId={application.id} jobTitle={job.title} company={job.company} />
+        )}
       </div>
     </main>
   );

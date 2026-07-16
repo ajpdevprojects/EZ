@@ -40,6 +40,6 @@ test.describe("Demo mode (no Supabase configured)", () => {
     await page.getByRole("link", { name: /Product Designer/ }).first().click();
     await expect(page).toHaveURL(/\/jobs\/job-1$/);
     await expect(page.getByRole("heading", { name: "Product Designer" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Apply Now" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Applied" })).toBeVisible();
   });
 });

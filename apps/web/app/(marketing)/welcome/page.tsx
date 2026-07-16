@@ -1,4 +1,4 @@
-import { Button } from "@ez/ui";
+import { Button, EzWordmark } from "@ez/ui";
 import { Briefcase, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
@@ -24,12 +24,7 @@ export default function WelcomePage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-between gap-10 px-6 py-12">
       <div className="flex flex-col items-center gap-6 text-center">
-        <div
-          aria-hidden="true"
-          className="flex size-20 items-center justify-center rounded-full bg-linear-to-br from-rose-gold to-warm-taupe text-2xl font-display font-semibold text-midnight"
-        >
-          E
-        </div>
+        <EzWordmark className="h-16 w-auto" />
         <div className="flex flex-col gap-3">
           <h1 className="font-display text-4xl font-semibold leading-tight text-foreground">
             Welcome to EZ,

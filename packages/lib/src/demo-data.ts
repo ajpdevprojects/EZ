@@ -1,4 +1,18 @@
-import type { Application, DailyBriefing, Job, Profile } from "@ez/types";
+import type {
+  Application,
+  CoverLetter,
+  DailyBriefing,
+  Interview,
+  Job,
+  JourneyMilestone,
+  LearningProgress,
+  LearningResource,
+  Notification,
+  Profile,
+  Resume,
+  UserIntegration,
+} from "@ez/types";
+import { createEmptyResumeContent } from "@ez/types";
 
 /**
  * Demo data used when Supabase has not been configured, so the product
@@ -148,7 +162,408 @@ export const DEMO_APPLICATIONS: Application[] = [
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
     job: DEMO_JOBS[2],
   },
+  {
+    id: "app-4",
+    userId: DEMO_PROFILE.id,
+    jobId: "job-5",
+    status: "hired",
+    matchScore: 90,
+    matchReason: "Your product strategy experience was a strong match.",
+    appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    notes: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    job: DEMO_JOBS[4],
+  },
 ];
+
+export const DEMO_INTERVIEWS: Interview[] = [
+  {
+    id: "interview-1",
+    applicationId: "app-2",
+    userId: DEMO_PROFILE.id,
+    interviewType: "video",
+    status: "scheduled",
+    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString(),
+    locationOrLink: "https://meet.example.com/vertex-interview",
+    notes: "Panel interview with the design lead and a product manager.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    application: DEMO_APPLICATIONS[1],
+  },
+  {
+    id: "interview-2",
+    applicationId: "app-4",
+    userId: DEMO_PROFILE.id,
+    interviewType: "onsite",
+    status: "completed",
+    scheduledAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
+    locationOrLink: "Meridian HQ, San Francisco",
+    notes: "Final round with the VP of Product. Went well — offer followed a week later.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 25).toISOString(),
+    application: DEMO_APPLICATIONS[3],
+  },
+];
+
+export const DEMO_JOURNEY_MILESTONES: JourneyMilestone[] = [
+  {
+    id: "milestone-1",
+    applicationId: "app-4",
+    type: "journey_started",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-2",
+    applicationId: "app-4",
+    type: "application_submitted",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-3",
+    applicationId: "app-4",
+    type: "recruiter_replied",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 35).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-4",
+    applicationId: "app-4",
+    type: "interview_scheduled",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 28).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-5",
+    applicationId: "app-4",
+    type: "interview_completed",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-6",
+    applicationId: "app-4",
+    type: "offer_received",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-7",
+    applicationId: "app-4",
+    type: "offer_accepted",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-8",
+    applicationId: "app-4",
+    type: "journey_completed",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-9",
+    applicationId: "app-2",
+    type: "journey_started",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-10",
+    applicationId: "app-2",
+    type: "application_submitted",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-11",
+    applicationId: "app-2",
+    type: "interview_scheduled",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-12",
+    applicationId: "app-1",
+    type: "journey_started",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-13",
+    applicationId: "app-1",
+    type: "application_submitted",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-14",
+    applicationId: "app-3",
+    type: "journey_started",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    metadata: null,
+  },
+  {
+    id: "milestone-15",
+    applicationId: "app-3",
+    type: "application_submitted",
+    occurredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    metadata: null,
+  },
+];
+
+export const DEMO_RESUMES: Resume[] = [
+  {
+    id: "resume-1",
+    userId: DEMO_PROFILE.id,
+    title: "Product Designer Resume",
+    isPrimary: true,
+    template: "modern",
+    content: {
+      contact: {
+        fullName: "Alex Morgan",
+        email: "you@example.com",
+        phone: "(555) 010-2020",
+        location: "Remote",
+        linkedinUrl: "https://linkedin.com/in/alexmorgan",
+        portfolioUrl: "https://alexmorgan.design",
+      },
+      summary:
+        "Product designer with 6 years of experience shipping design systems and user-centered products for high-growth teams.",
+      experience: [
+        {
+          id: "exp-1",
+          title: "Senior Product Designer",
+          company: "Flow Studio",
+          location: "Remote",
+          startDate: "2022-01",
+          endDate: null,
+          highlights: [
+            "Led the redesign of the core design system, reducing engineering handoff time by 40%.",
+            "Partnered with product and engineering to ship 12 major features in 18 months.",
+          ],
+        },
+        {
+          id: "exp-2",
+          title: "Product Designer",
+          company: "Northwind Labs",
+          location: "Remote",
+          startDate: "2019-03",
+          endDate: "2021-12",
+          highlights: [
+            "Designed and shipped the onboarding flow that improved activation by 25%.",
+          ],
+        },
+      ],
+      education: [
+        {
+          id: "edu-1",
+          school: "State University",
+          degree: "B.A.",
+          field: "Human-Computer Interaction",
+          startDate: "2015-09",
+          endDate: "2019-05",
+        },
+      ],
+      skills: ["Figma", "Design Systems", "Prototyping", "User Research", "Accessibility"],
+    },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+  },
+];
+
+export const DEMO_COVER_LETTERS: CoverLetter[] = [
+  {
+    id: "cover-letter-1",
+    userId: DEMO_PROFILE.id,
+    applicationId: "app-1",
+    title: "Acme Inc. — Product Designer",
+    content:
+      "Dear Hiring Team,\n\nI'm excited to apply for the Product Designer role at Acme Inc. My background in design systems and user research aligns closely with what you're building...",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    application: DEMO_APPLICATIONS[0],
+  },
+];
+
+export const DEMO_LEARNING_RESOURCES: LearningResource[] = [
+  {
+    id: "learning-1",
+    title: "Mastering the STAR Method",
+    description: "Structure compelling behavioral interview answers using Situation, Task, Action, Result.",
+    category: "Interviewing",
+    resourceType: "article",
+    skillTags: ["Interviewing", "Communication"],
+    url: "https://example.com/learning/star-method",
+    durationMinutes: 10,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "learning-2",
+    title: "Portfolio Case Studies That Get Callbacks",
+    description: "How to structure a case study that shows real product thinking, not just polished screens.",
+    category: "Design",
+    resourceType: "article",
+    skillTags: ["Portfolio", "Design"],
+    url: "https://example.com/learning/portfolio-case-studies",
+    durationMinutes: 15,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "learning-3",
+    title: "Negotiating Your Offer with Confidence",
+    description: "A practical walkthrough of salary negotiation scripts and timing.",
+    category: "Negotiation",
+    resourceType: "video",
+    skillTags: ["Negotiation", "Salary"],
+    url: "https://example.com/learning/negotiating-offers",
+    durationMinutes: 22,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "learning-4",
+    title: "Design Systems Fundamentals",
+    description: "A short course on tokens, component APIs, and governance for design systems.",
+    category: "Design",
+    resourceType: "course",
+    skillTags: ["Design Systems", "Figma"],
+    url: "https://example.com/learning/design-systems-fundamentals",
+    durationMinutes: 90,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "learning-5",
+    title: "Modern React Patterns",
+    description: "Hooks, composition, and server components explained through practical examples.",
+    category: "Engineering",
+    resourceType: "course",
+    skillTags: ["React", "TypeScript"],
+    url: "https://example.com/learning/modern-react-patterns",
+    durationMinutes: 120,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "learning-6",
+    title: "Writing Cover Letters That Aren't Generic",
+    description: "A framework for tailoring a cover letter to a specific role in under 20 minutes.",
+    category: "Job Search",
+    resourceType: "article",
+    skillTags: ["Cover Letters", "Writing"],
+    url: "https://example.com/learning/cover-letters",
+    durationMinutes: 12,
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const DEMO_LEARNING_PROGRESS: LearningProgress[] = [
+  {
+    id: "progress-1",
+    userId: DEMO_PROFILE.id,
+    resourceId: "learning-1",
+    status: "completed",
+    completedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+  },
+  {
+    id: "progress-2",
+    userId: DEMO_PROFILE.id,
+    resourceId: "learning-4",
+    status: "in_progress",
+    completedAt: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+  },
+];
+
+export const DEMO_NOTIFICATIONS: Notification[] = [
+  {
+    id: "notification-1",
+    userId: DEMO_PROFILE.id,
+    type: "interview_scheduled",
+    title: "Interview scheduled",
+    body: "Your interview for UI/UX Designer at Vertex is confirmed for in 2 days.",
+    readAt: null,
+    metadata: { applicationId: "app-2" },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+  {
+    id: "notification-2",
+    userId: DEMO_PROFILE.id,
+    type: "new_opportunity",
+    title: "New opportunity found",
+    body: "Senior Frontend Engineer at Northwind Labs matches your preferences.",
+    readAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    metadata: { jobId: "job-4" },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+  {
+    id: "notification-3",
+    userId: DEMO_PROFILE.id,
+    type: "journey_completed",
+    title: "Journey completed",
+    body: "You accepted the offer from Meridian. Congratulations!",
+    readAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+    metadata: { applicationId: "app-4" },
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+  },
+];
+
+export const DEMO_INTEGRATIONS: UserIntegration[] = [
+  {
+    id: "integration-1",
+    userId: DEMO_PROFILE.id,
+    provider: "google_gmail",
+    status: "disconnected",
+    connectedAt: null,
+    metadata: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "integration-2",
+    userId: DEMO_PROFILE.id,
+    provider: "google_calendar",
+    status: "disconnected",
+    connectedAt: null,
+    metadata: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "integration-3",
+    userId: DEMO_PROFILE.id,
+    provider: "google_drive",
+    status: "disconnected",
+    connectedAt: null,
+    metadata: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "integration-4",
+    userId: DEMO_PROFILE.id,
+    provider: "linkedin",
+    status: "disconnected",
+    connectedAt: null,
+    metadata: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export function createEmptyDemoResume(title: string): Resume {
+  return {
+    id: `resume-${crypto.randomUUID()}`,
+    userId: DEMO_PROFILE.id,
+    title,
+    isPrimary: false,
+    template: "classic",
+    content: createEmptyResumeContent(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export function getDemoDailyBriefing(): DailyBriefing {
   const applicationsInProgress = DEMO_APPLICATIONS.filter(

@@ -140,6 +140,106 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["ai_messages"]["Row"]>;
         Relationships: [];
       };
+      resumes: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          is_primary: boolean;
+          template: string;
+          content: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["resumes"]["Row"]> & { user_id: string };
+        Update: Partial<Database["public"]["Tables"]["resumes"]["Row"]>;
+        Relationships: [];
+      };
+      cover_letters: {
+        Row: {
+          id: string;
+          user_id: string;
+          application_id: string | null;
+          title: string;
+          content: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["cover_letters"]["Row"]> & { user_id: string };
+        Update: Partial<Database["public"]["Tables"]["cover_letters"]["Row"]>;
+        Relationships: [];
+      };
+      learning_resources: {
+        Row: {
+          id: string;
+          title: string;
+          description: string;
+          category: string;
+          resource_type: string;
+          skill_tags: string[];
+          url: string | null;
+          duration_minutes: number | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["learning_resources"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["learning_resources"]["Row"]>;
+        Relationships: [];
+      };
+      learning_progress: {
+        Row: {
+          id: string;
+          user_id: string;
+          resource_id: string;
+          status: string;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["learning_progress"]["Row"]> & {
+          user_id: string;
+          resource_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["learning_progress"]["Row"]>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string;
+          read_at: string | null;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["notifications"]["Row"]> & {
+          user_id: string;
+          type: string;
+          title: string;
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
+        Relationships: [];
+      };
+      user_integrations: {
+        Row: {
+          id: string;
+          user_id: string;
+          provider: string;
+          status: string;
+          connected_at: string | null;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["user_integrations"]["Row"]> & {
+          user_id: string;
+          provider: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_integrations"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

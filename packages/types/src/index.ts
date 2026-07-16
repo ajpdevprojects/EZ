@@ -101,13 +101,15 @@ export interface Interview {
   locationOrLink: string | null;
   notes: string | null;
   createdAt: string;
+  application?: Application;
 }
 
 export type AiConversationContext =
   | "general"
   | "resume"
   | "cover_letter"
-  | "interview_prep";
+  | "interview_prep"
+  | "career_coaching";
 
 export interface AiConversation {
   id: string;
@@ -134,4 +136,153 @@ export interface DailyBriefing {
   interviewsUpcoming: number;
   recommendedJobs: Job[];
   nextAction: string | null;
+}
+
+// ---------------------------------------------------------------------
+// Resume System
+// ---------------------------------------------------------------------
+
+export interface ResumeExperienceEntry {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate: string | null;
+  highlights: string[];
+}
+
+export interface ResumeEducationEntry {
+  id: string;
+  school: string;
+  degree: string;
+  field: string;
+  startDate: string;
+  endDate: string | null;
+}
+
+export interface ResumeContact {
+  fullName: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedinUrl: string;
+  portfolioUrl: string;
+}
+
+export interface ResumeContent {
+  contact: ResumeContact;
+  summary: string;
+  experience: ResumeExperienceEntry[];
+  education: ResumeEducationEntry[];
+  skills: string[];
+}
+
+export type ResumeTemplate = "classic" | "modern" | "minimal";
+
+export interface Resume {
+  id: string;
+  userId: string;
+  title: string;
+  isPrimary: boolean;
+  template: ResumeTemplate;
+  content: ResumeContent;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function createEmptyResumeContent(): ResumeContent {
+  return {
+    contact: { fullName: "", email: "", phone: "", location: "", linkedinUrl: "", portfolioUrl: "" },
+    summary: "",
+    experience: [],
+    education: [],
+    skills: [],
+  };
+}
+
+// ---------------------------------------------------------------------
+// Documents Center
+// ---------------------------------------------------------------------
+
+export interface CoverLetter {
+  id: string;
+  userId: string;
+  applicationId: string | null;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  application?: Application;
+}
+
+// ---------------------------------------------------------------------
+// Learning Hub
+// ---------------------------------------------------------------------
+
+export type LearningResourceType = "article" | "video" | "course";
+export type LearningProgressStatus = "not_started" | "in_progress" | "completed";
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  resourceType: LearningResourceType;
+  skillTags: string[];
+  url: string | null;
+  durationMinutes: number | null;
+  createdAt: string;
+}
+
+export interface LearningProgress {
+  id: string;
+  userId: string;
+  resourceId: string;
+  status: LearningProgressStatus;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------
+
+export type NotificationType =
+  | "daily_briefing"
+  | "new_opportunity"
+  | "recruiter_replied"
+  | "interview_scheduled"
+  | "interview_reminder"
+  | "offer_received"
+  | "journey_completed";
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  readAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Integrations
+// ---------------------------------------------------------------------
+
+export type IntegrationProvider = "google_gmail" | "google_calendar" | "google_drive" | "linkedin";
+export type IntegrationStatus = "connected" | "disconnected";
+
+export interface UserIntegration {
+  id: string;
+  userId: string;
+  provider: IntegrationProvider;
+  status: IntegrationStatus;
+  connectedAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
 }

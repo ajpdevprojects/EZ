@@ -5,8 +5,8 @@ import { Button, toast } from "@ez/ui";
 import { CheckCircle2 } from "lucide-react";
 import * as React from "react";
 
-export function ApplyButton({ jobId }: { jobId: string }) {
-  const [isApplied, setIsApplied] = React.useState(false);
+export function ApplyButton({ jobId, initiallyApplied = false }: { jobId: string; initiallyApplied?: boolean }) {
+  const [isApplied, setIsApplied] = React.useState(initiallyApplied);
   const [isPending, startTransition] = React.useTransition();
 
   function handleApply() {

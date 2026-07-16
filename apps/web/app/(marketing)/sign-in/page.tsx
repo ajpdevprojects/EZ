@@ -1,18 +1,13 @@
 import { OAuthButtons } from "@/features/auth/components/oauth-buttons";
 import { SignInForm } from "@/features/auth/components/sign-in-form";
-import { Divider } from "@ez/ui";
+import { Divider, EzWordmark } from "@ez/ui";
 import Link from "next/link";
 
 export default function SignInPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-6 py-12">
       <div className="flex flex-col items-center gap-2 text-center">
-        <div
-          aria-hidden="true"
-          className="mb-2 flex size-14 items-center justify-center rounded-full bg-linear-to-br from-rose-gold to-warm-taupe text-xl font-display font-semibold text-midnight"
-        >
-          E
-        </div>
+        <EzWordmark className="mb-2 h-12 w-auto" />
         <h1 className="font-display text-3xl font-semibold text-foreground">
           Welcome <span className="text-primary">back</span>
         </h1>

@@ -23,3 +23,12 @@ export async function getMyApplications(userId: string, isDemo: boolean): Promis
     return mapApplication(applicationRow, jobRow ?? undefined);
   });
 }
+
+export async function getApplicationForJob(
+  userId: string,
+  jobId: string,
+  isDemo: boolean,
+): Promise<Application | null> {
+  const applications = await getMyApplications(userId, isDemo);
+  return applications.find((application) => application.jobId === jobId) ?? null;
+}

@@ -1,3 +1,4 @@
+import { QuickLinks } from "@/features/home/components/quick-links";
 import { JobCard } from "@/features/jobs/components/job-card";
 import { getCurrentSession } from "@/lib/session";
 import { getDailyBriefing } from "@/features/home/data";
@@ -34,6 +35,8 @@ export default async function HomePage() {
           </div>
         </div>
       )}
+
+      <QuickLinks />
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-lg font-semibold text-foreground">Recommended for you</h2>

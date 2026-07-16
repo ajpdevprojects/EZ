@@ -1,3 +1,5 @@
+import { HubMenu } from "@/features/profile/components/hub-menu";
+import { JourneyThemeSelector } from "@/features/profile/components/journey-theme-selector";
 import { SignOutButton } from "@/features/profile/components/sign-out-button";
 import { getCurrentSession } from "@/lib/session";
 import { Avatar, AvatarFallback, Badge, Card, CardContent } from "@ez/ui";
@@ -68,6 +70,14 @@ export default async function ProfilePage() {
           />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardContent className="p-5">
+          <JourneyThemeSelector theme={profile.journeyTheme} />
+        </CardContent>
+      </Card>
+
+      <HubMenu />
 
       <SignOutButton />
     </main>
