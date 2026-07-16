@@ -7,10 +7,16 @@ import { getSupabaseEnv } from "./env";
  * Supabase has not been configured.
  */
 export async function updateSession(request: NextRequest) {
-  const response = NextResponse.next({ request });
-
   const env = getSupabaseEnv();
-  if (!env) return response;
+  if (!env) return NextResponse.next({ request });
+
+  // `response` is intentionally re-created inside setAll (not reused from
+  // outer scope) so it's always built from a request whose cookies already
+  // reflect the refreshed session — otherwise the Server Component render
+  // for *this* navigation can read stale request cookies even though the
+  // browser receives the new ones. This is the cookie-handling pattern
+  // Supabase's Next.js SSR guide specifies for this exact reason.
+  let response = NextResponse.next({ request });
 
   const supabase = createServerClient(env.url, env.anonKey, {
     cookies: {
@@ -21,6 +27,7 @@ export async function updateSession(request: NextRequest) {
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
+        response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
