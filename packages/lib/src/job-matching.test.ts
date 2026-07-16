@@ -32,7 +32,7 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     fullName: "Alex Morgan",
     avatarUrl: null,
     careerGoals: ["find_new_job"],
-    currentRole: "Frontend Engineer",
+    currentJobTitle: "Frontend Engineer",
     preferredLocations: ["Remote"],
     workTypes: ["full_time"],
     priorities: [],

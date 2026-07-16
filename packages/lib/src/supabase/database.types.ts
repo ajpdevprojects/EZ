@@ -12,7 +12,7 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           career_goals: string[];
-          current_role: string | null;
+          current_job_title: string | null;
           preferred_locations: string[];
           work_types: string[];
           priorities: string[];

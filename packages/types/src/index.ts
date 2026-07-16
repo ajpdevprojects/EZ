@@ -15,7 +15,7 @@ export interface Profile {
   fullName: string | null;
   avatarUrl: string | null;
   careerGoals: CareerGoal[];
-  currentRole: string | null;
+  currentJobTitle: string | null;
   preferredLocations: string[];
   workTypes: WorkType[];
   priorities: string[];

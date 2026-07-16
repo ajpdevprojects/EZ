@@ -28,7 +28,7 @@ export async function completeOnboardingAction(
       .from("profiles")
       .update({
         career_goals: parsed.data.careerGoals,
-        current_role: parsed.data.currentRole,
+        current_job_title: parsed.data.currentJobTitle,
         preferred_locations: parsed.data.preferredLocations,
         work_types: parsed.data.workTypes,
         priorities: parsed.data.priorities,

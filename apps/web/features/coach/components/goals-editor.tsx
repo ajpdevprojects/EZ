@@ -13,7 +13,7 @@ function toggle(list: string[], value: string): string[] {
 
 export function GoalsEditor({ profile }: { profile: Profile }) {
   const [careerGoals, setCareerGoals] = React.useState<string[]>(profile.careerGoals);
-  const [currentRole, setCurrentRole] = React.useState(profile.currentRole ?? "");
+  const [currentJobTitle, setCurrentJobTitle] = React.useState(profile.currentJobTitle ?? "");
   const [preferredLocations, setPreferredLocations] = React.useState<string[]>(profile.preferredLocations);
   const [locationDraft, setLocationDraft] = React.useState("");
   const [workTypes, setWorkTypes] = React.useState<string[]>(profile.workTypes);
@@ -24,7 +24,7 @@ export function GoalsEditor({ profile }: { profile: Profile }) {
     setIsSaving(true);
     const result = await updateCareerGoalsAction({
       careerGoals,
-      currentRole,
+      currentJobTitle,
       details: "",
       preferredLocations,
       workTypes,
@@ -58,7 +58,7 @@ export function GoalsEditor({ profile }: { profile: Profile }) {
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="current-role">Current role</Label>
-          <Input id="current-role" value={currentRole} onChange={(event) => setCurrentRole(event.target.value)} />
+          <Input id="current-role" value={currentJobTitle} onChange={(event) => setCurrentJobTitle(event.target.value)} />
         </div>
 
         <div className="flex flex-col gap-2">

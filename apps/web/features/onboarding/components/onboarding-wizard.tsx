@@ -33,7 +33,7 @@ export function OnboardingWizard() {
   const goToNextStep = useOnboardingStore((state) => state.goToNextStep);
   const goToPreviousStep = useOnboardingStore((state) => state.goToPreviousStep);
   const careerGoals = useOnboardingStore((state) => state.careerGoals);
-  const currentRole = useOnboardingStore((state) => state.currentRole);
+  const currentJobTitle = useOnboardingStore((state) => state.currentJobTitle);
   const preferredLocations = useOnboardingStore((state) => state.preferredLocations);
   const workTypes = useOnboardingStore((state) => state.workTypes);
   const priorities = useOnboardingStore((state) => state.priorities);
@@ -48,7 +48,7 @@ export function OnboardingWizard() {
       case 1:
         return careerGoals.length > 0;
       case 2:
-        return currentRole.trim().length > 0;
+        return currentJobTitle.trim().length > 0;
       case 3:
         return preferredLocations.length > 0;
       case 4:
@@ -58,7 +58,7 @@ export function OnboardingWizard() {
       default:
         return true;
     }
-  }, [stepIndex, careerGoals, currentRole, preferredLocations, workTypes, priorities]);
+  }, [stepIndex, careerGoals, currentJobTitle, preferredLocations, workTypes, priorities]);
 
   async function handleContinue() {
     setError(null);
@@ -71,7 +71,7 @@ export function OnboardingWizard() {
     setIsSubmitting(true);
     const result = await completeOnboardingAction({
       careerGoals,
-      currentRole,
+      currentJobTitle,
       details,
       preferredLocations,
       workTypes,

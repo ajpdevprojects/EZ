@@ -54,7 +54,7 @@ export function mapProfile(row: ProfileRow): Profile {
     fullName: row.full_name,
     avatarUrl: row.avatar_url,
     careerGoals: row.career_goals as CareerGoal[],
-    currentRole: row.current_role,
+    currentJobTitle: row.current_job_title,
     preferredLocations: row.preferred_locations,
     workTypes: row.work_types as WorkType[],
     priorities: row.priorities,

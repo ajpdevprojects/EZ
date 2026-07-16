@@ -118,11 +118,11 @@ function computeLocationFactor(job: Job, profile: Profile): ConfidenceFactor {
 
 function computeRoleFactor(job: Job, profile: Profile): ConfidenceFactor {
   const maxPoints = FACTOR_BUDGET.role;
-  if (!profile.currentRole) {
+  if (!profile.currentJobTitle) {
     return { key: "role", label: "Role alignment", points: 0, maxPoints, detail: "Add your current role to personalize this factor." };
   }
 
-  const firstWord = normalize(profile.currentRole).split(" ")[0];
+  const firstWord = normalize(profile.currentJobTitle).split(" ")[0];
   const aligns = Boolean(firstWord && normalize(job.title).includes(firstWord));
 
   return {
@@ -130,7 +130,7 @@ function computeRoleFactor(job: Job, profile: Profile): ConfidenceFactor {
     label: "Role alignment",
     points: aligns ? maxPoints : 0,
     maxPoints,
-    detail: aligns ? `Title aligns with your current role (${profile.currentRole}).` : "Title doesn't closely match your current role.",
+    detail: aligns ? `Title aligns with your current role (${profile.currentJobTitle}).` : "Title doesn't closely match your current role.",
   };
 }
 

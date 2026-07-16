@@ -19,7 +19,7 @@ export function buildJobMatchPrompt(input: {
   company: string;
   description: string;
   requiredSkills: string[];
-  currentRole: string;
+  currentJobTitle: string;
   careerGoals: string[];
   priorities: string[];
   resumeSummary: string;
@@ -33,7 +33,7 @@ Job: ${input.jobTitle} at ${input.company}
 Job description: ${input.description}
 Required skills: ${input.requiredSkills.join(", ")}
 
-Candidate's current role: ${input.currentRole || "unknown"}
+Candidate's current role: ${input.currentJobTitle || "unknown"}
 Candidate's career goals: ${input.careerGoals.join(", ") || "unspecified"}
 Candidate's priorities: ${input.priorities.join(", ") || "unspecified"}
 Candidate's resume summary: ${input.resumeSummary || "no resume on file"}

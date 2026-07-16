@@ -13,7 +13,7 @@ export const ONBOARDING_STEPS = [
 interface OnboardingState {
   stepIndex: number;
   careerGoals: string[];
-  currentRole: string;
+  currentJobTitle: string;
   details: string;
   preferredLocations: string[];
   workTypes: string[];
@@ -21,7 +21,7 @@ interface OnboardingState {
   goToNextStep: () => void;
   goToPreviousStep: () => void;
   toggleCareerGoal: (value: string) => void;
-  setCurrentRole: (value: string) => void;
+  setCurrentJobTitle: (value: string) => void;
   setDetails: (value: string) => void;
   addLocation: (value: string) => void;
   removeLocation: (value: string) => void;
@@ -36,7 +36,7 @@ function toggleValue(values: string[], value: string): string[] {
 export const useOnboardingStore = create<OnboardingState>((set) => ({
   stepIndex: 0,
   careerGoals: [],
-  currentRole: "",
+  currentJobTitle: "",
   details: "",
   preferredLocations: [],
   workTypes: [],
@@ -45,7 +45,7 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
     set((state) => ({ stepIndex: Math.min(state.stepIndex + 1, ONBOARDING_STEPS.length - 1) })),
   goToPreviousStep: () => set((state) => ({ stepIndex: Math.max(state.stepIndex - 1, 0) })),
   toggleCareerGoal: (value) => set((state) => ({ careerGoals: toggleValue(state.careerGoals, value) })),
-  setCurrentRole: (value) => set({ currentRole: value }),
+  setCurrentJobTitle: (value) => set({ currentJobTitle: value }),
   setDetails: (value) => set({ details: value }),
   addLocation: (value) =>
     set((state) =>

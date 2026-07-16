@@ -48,8 +48,8 @@ export function GoalsStep() {
 }
 
 export function RoleStep() {
-  const currentRole = useOnboardingStore((state) => state.currentRole);
-  const setCurrentRole = useOnboardingStore((state) => state.setCurrentRole);
+  const currentJobTitle = useOnboardingStore((state) => state.currentJobTitle);
+  const setCurrentJobTitle = useOnboardingStore((state) => state.setCurrentJobTitle);
   const details = useOnboardingStore((state) => state.details);
   const setDetails = useOnboardingStore((state) => state.setDetails);
 
@@ -60,8 +60,8 @@ export function RoleStep() {
         <Label htmlFor="current-role">Current role</Label>
         <Input
           id="current-role"
-          value={currentRole}
-          onChange={(event) => setCurrentRole(event.target.value)}
+          value={currentJobTitle}
+          onChange={(event) => setCurrentJobTitle(event.target.value)}
           placeholder="Product Designer"
         />
       </div>

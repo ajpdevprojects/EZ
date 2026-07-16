@@ -29,7 +29,7 @@ export const DEMO_PROFILE: Profile = {
   fullName: "Alex Morgan",
   avatarUrl: null,
   careerGoals: ["find_new_job"],
-  currentRole: "Product Designer",
+  currentJobTitle: "Product Designer",
   preferredLocations: ["Remote"],
   workTypes: ["full_time"],
   priorities: ["career_growth", "work_life_balance"],

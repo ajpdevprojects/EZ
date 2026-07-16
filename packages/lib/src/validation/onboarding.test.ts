@@ -3,7 +3,7 @@ import { onboardingSchema } from "./onboarding";
 
 const validPayload = {
   careerGoals: ["find_new_job"],
-  currentRole: "Product Designer",
+  currentJobTitle: "Product Designer",
   details: "",
   preferredLocations: ["Remote"],
   workTypes: ["full_time"],
@@ -21,7 +21,7 @@ describe("onboardingSchema", () => {
   });
 
   it("rejects a payload with a blank current role", () => {
-    const result = onboardingSchema.safeParse({ ...validPayload, currentRole: "  " });
+    const result = onboardingSchema.safeParse({ ...validPayload, currentJobTitle: "  " });
     expect(result.success).toBe(false);
   });
 

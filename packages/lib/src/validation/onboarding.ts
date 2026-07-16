@@ -4,8 +4,8 @@ export const careerGoalsStepSchema = z.object({
   careerGoals: z.array(z.string()).min(1, "Select at least one option"),
 });
 
-export const currentRoleStepSchema = z.object({
-  currentRole: z.string().trim().min(1, "Tell us your current role"),
+export const currentJobTitleStepSchema = z.object({
+  currentJobTitle: z.string().trim().min(1, "Tell us your current role"),
   details: z.string().trim().optional(),
 });
 
@@ -22,7 +22,7 @@ export const prioritiesStepSchema = z.object({
 });
 
 export const onboardingSchema = careerGoalsStepSchema
-  .merge(currentRoleStepSchema)
+  .merge(currentJobTitleStepSchema)
   .merge(locationsStepSchema)
   .merge(workTypesStepSchema)
   .merge(prioritiesStepSchema);

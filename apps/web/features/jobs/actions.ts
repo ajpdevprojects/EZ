@@ -49,7 +49,7 @@ export async function analyzeJobMatchAction(jobId: string): Promise<{ analysis?:
     supabase.from("jobs").select("title, company, description, skills").eq("id", jobId).maybeSingle(),
     supabase
       .from("profiles")
-      .select("current_role, career_goals, priorities")
+      .select("current_job_title, career_goals, priorities")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -69,7 +69,7 @@ export async function analyzeJobMatchAction(jobId: string): Promise<{ analysis?:
     company: job.company,
     description: job.description,
     requiredSkills: job.skills,
-    currentRole: profile?.current_role ?? "",
+    currentJobTitle: profile?.current_job_title ?? "",
     careerGoals: profile?.career_goals ?? [],
     priorities: profile?.priorities ?? [],
     resumeSummary: resumeContent?.summary ?? "",

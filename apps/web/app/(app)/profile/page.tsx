@@ -35,7 +35,7 @@ export default async function ProfilePage() {
 
       <Card>
         <CardContent className="flex flex-col gap-4 p-5">
-          <ProfileField label="Current role" value={profile.currentRole ?? "Not set"} />
+          <ProfileField label="Current role" value={profile.currentJobTitle ?? "Not set"} />
           <ProfileField
             label="Preferred locations"
             value={
