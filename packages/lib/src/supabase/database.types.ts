@@ -1,0 +1,147 @@
+/**
+ * Hand-maintained mirror of supabase/migrations/*.sql. Keep in sync with
+ * the schema whenever a migration changes table shape.
+ */
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          career_goals: string[];
+          current_role: string | null;
+          preferred_locations: string[];
+          work_types: string[];
+          priorities: string[];
+          journey_theme: string;
+          onboarding_completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]> & { id: string };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+        Relationships: [];
+      };
+      jobs: {
+        Row: {
+          id: string;
+          title: string;
+          company: string;
+          location: string | null;
+          is_remote: boolean;
+          employment_type: string;
+          seniority_level: string | null;
+          salary_min: number | null;
+          salary_max: number | null;
+          description: string;
+          skills: string[];
+          apply_url: string | null;
+          posted_at: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["jobs"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["jobs"]["Row"]>;
+        Relationships: [];
+      };
+      applications: {
+        Row: {
+          id: string;
+          user_id: string;
+          job_id: string;
+          status: string;
+          match_score: number | null;
+          match_reason: string | null;
+          applied_at: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["applications"]["Row"]> & {
+          user_id: string;
+          job_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["applications"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "applications_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      journey_milestones: {
+        Row: {
+          id: string;
+          application_id: string;
+          type: string;
+          occurred_at: string;
+          metadata: Record<string, unknown> | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["journey_milestones"]["Row"]> & {
+          application_id: string;
+          type: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["journey_milestones"]["Row"]>;
+        Relationships: [];
+      };
+      interviews: {
+        Row: {
+          id: string;
+          application_id: string;
+          user_id: string;
+          interview_type: string;
+          status: string;
+          scheduled_at: string;
+          location_or_link: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["interviews"]["Row"]> & {
+          application_id: string;
+          user_id: string;
+          scheduled_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["interviews"]["Row"]>;
+        Relationships: [];
+      };
+      ai_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          context: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["ai_conversations"]["Row"]> & {
+          user_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_conversations"]["Row"]>;
+        Relationships: [];
+      };
+      ai_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["ai_messages"]["Row"]> & {
+          conversation_id: string;
+          role: string;
+          content: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_messages"]["Row"]>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+  };
+}
