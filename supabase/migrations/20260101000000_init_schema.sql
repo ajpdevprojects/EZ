@@ -26,7 +26,7 @@ create table public.profiles (
   full_name text,
   avatar_url text,
   career_goals text[] not null default '{}',
-  current_role text,
+  current_job_title text,
   preferred_locations text[] not null default '{}',
   work_types text[] not null default '{}',
   priorities text[] not null default '{}',
