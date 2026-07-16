@@ -29,5 +29,8 @@ export * from "./job-discovery/dedupe";
 export * from "./job-discovery/ingest";
 export * from "./job-discovery/sources";
 export * from "./job-matching";
+export * from "./learning";
+export * from "./mission-control";
+export * from "./resume-performance";
 export * from "./skill-gap";
 export * from "./email-categorization";

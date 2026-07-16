@@ -5,7 +5,7 @@ test.describe("Demo mode (no Supabase configured)", () => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByRole("heading", { name: "Alex Morgan" })).toBeVisible();
-    await expect(page.getByText("Recommended for you")).toBeVisible();
+    await expect(page.getByText("Today's opportunities")).toBeVisible();
   });
 
   test("welcome screen introduces Elizabeth", async ({ page }) => {
@@ -37,9 +37,9 @@ test.describe("Demo mode (no Supabase configured)", () => {
 
   test("navigating from home to a job shows its details", async ({ page }) => {
     await page.goto("/home");
-    await page.getByRole("link", { name: /Product Designer/ }).first().click();
-    await expect(page).toHaveURL(/\/jobs\/job-1$/);
-    await expect(page.getByRole("heading", { name: "Product Designer" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Applied" })).toBeVisible();
+    await page.getByRole("link", { name: /Senior Frontend Engineer/ }).first().click();
+    await expect(page).toHaveURL(/\/jobs\/job-4$/);
+    await expect(page.getByRole("heading", { name: "Senior Frontend Engineer" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Apply Now" })).toBeVisible();
   });
 });

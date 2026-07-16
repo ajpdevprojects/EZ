@@ -1,7 +1,7 @@
 import { formatRelativeTime, formatSalaryRange } from "@ez/lib";
 import { Badge, Card, CardContent, CardHeader } from "@ez/ui";
 import type { Job } from "@ez/types";
-import { Bookmark, Briefcase } from "lucide-react";
+import { Bookmark, Briefcase, X } from "lucide-react";
 import Link from "next/link";
 import { EMPLOYMENT_TYPE_LABEL, SENIORITY_LABEL } from "../labels";
 
@@ -9,11 +9,12 @@ export interface JobCardProps {
   job: Job;
   saved?: boolean;
   onToggleSave?: (jobId: string) => void;
+  onDismiss?: (jobId: string) => void;
   matchScore?: number;
   matchReason?: string;
 }
 
-export function JobCard({ job, saved = false, onToggleSave, matchScore, matchReason }: JobCardProps) {
+export function JobCard({ job, saved = false, onToggleSave, onDismiss, matchScore, matchReason }: JobCardProps) {
   const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
 
   return (
@@ -30,17 +31,29 @@ export function JobCard({ job, saved = false, onToggleSave, matchScore, matchRea
             </span>
           </span>
         </Link>
-        {onToggleSave && (
-          <button
-            type="button"
-            aria-pressed={saved}
-            aria-label={saved ? "Remove from saved jobs" : "Save job"}
-            onClick={() => onToggleSave(job.id)}
-            className="rounded-full p-1.5 text-muted-foreground transition-colors hover:text-primary"
-          >
-            <Bookmark className="size-4" aria-hidden="true" fill={saved ? "currentColor" : "none"} />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {onToggleSave && (
+            <button
+              type="button"
+              aria-pressed={saved}
+              aria-label={saved ? "Remove from saved jobs" : "Save job"}
+              onClick={() => onToggleSave(job.id)}
+              className="rounded-full p-1.5 text-muted-foreground transition-colors hover:text-primary"
+            >
+              <Bookmark className="size-4" aria-hidden="true" fill={saved ? "currentColor" : "none"} />
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              type="button"
+              aria-label={`Not interested in ${job.title} at ${job.company}`}
+              onClick={() => onDismiss(job.id)}
+              className="rounded-full p-1.5 text-muted-foreground transition-colors hover:text-destructive"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">

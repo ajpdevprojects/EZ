@@ -1,14 +1,14 @@
 "use client";
 
 import { deleteResumeAction, duplicateResumeAction, setPrimaryResumeAction } from "@/features/resume/actions";
-import { formatRelativeTime } from "@ez/lib";
+import { formatRelativeTime, type ResumePerformance } from "@ez/lib";
 import { Badge, Button, Card, CardContent, toast } from "@ez/ui";
 import type { Resume } from "@ez/types";
-import { Copy, FileText, Star, Trash2 } from "lucide-react";
+import { Copy, FileText, Star, Trash2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 
-export function ResumeCard({ resume }: { resume: Resume }) {
+export function ResumeCard({ resume, performance }: { resume: Resume; performance?: ResumePerformance }) {
   const [isPending, startTransition] = React.useTransition();
 
   function handleSetPrimary() {
@@ -49,6 +49,13 @@ export function ResumeCard({ resume }: { resume: Resume }) {
           </Link>
           {resume.isPrimary && <Badge variant="offer">Primary</Badge>}
         </div>
+        {performance && performance.applications > 0 && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <TrendingUp className="size-3.5 shrink-0" aria-hidden="true" />
+            {performance.applications} {performance.applications === 1 ? "application" : "applications"} ·{" "}
+            {performance.interviewRate}% interview rate
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           {!resume.isPrimary && (
             <Button variant="tertiary" size="sm" disabled={isPending} onClick={handleSetPrimary}>

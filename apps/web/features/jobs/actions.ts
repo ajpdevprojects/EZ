@@ -1,9 +1,33 @@
 "use server";
 
+import { getCurrentSession } from "@/lib/session";
 import { buildJobMatchPrompt, generateElizabethText, parseMatchAnalysis, type JobMatchAnalysis } from "@ez/lib";
 import { createClient } from "@ez/lib/supabase/server";
+import { revalidatePath } from "next/cache";
 
-export type { JobMatchAnalysis };
+/**
+ * Dismisses a job recommendation — a deliberate negative signal the
+ * Software Brain uses to deprioritize similar future recommendations
+ * (Product Evolution Directive: continuous learning, no AI required).
+ */
+export async function dismissJobRecommendationAction(jobId: string): Promise<{ error?: string }> {
+  const session = await getCurrentSession();
+  if (!session) return { error: "You need to be signed in." };
+  if (session.isDemo) return { error: "Connect Supabase to save dismissals — you're viewing a read-only demo." };
+
+  const supabase = await createClient();
+  if (!supabase) return { error: "Dismissing recommendations requires Supabase to be configured." };
+
+  const { error } = await supabase
+    .from("dismissed_jobs")
+    .upsert({ user_id: session.profile.id, job_id: jobId }, { onConflict: "user_id,job_id" });
+
+  if (error) return { error: "Couldn't dismiss this recommendation — please try again." };
+
+  revalidatePath("/home");
+  revalidatePath("/search");
+  return {};
+}
 
 /**
  * AI job analysis: compares a job against the professional's profile and

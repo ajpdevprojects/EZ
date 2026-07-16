@@ -3,8 +3,22 @@ import { expect, test } from "@playwright/test";
 test.describe("Job Search Operating System features (demo mode)", () => {
   test("home shows deterministic match scores for recommended jobs", async ({ page }) => {
     await page.goto("/home");
-    await expect(page.getByText("Recommended for you")).toBeVisible();
+    await expect(page.getByText("Today's opportunities")).toBeVisible();
     await expect(page.getByText(/% match/).first()).toBeVisible();
+  });
+
+  test("home surfaces today's priorities", async ({ page }) => {
+    await page.goto("/home");
+    await expect(page.getByText("Today's priorities")).toBeVisible();
+  });
+
+  test("dismissing a recommendation in demo mode explains it's read-only", async ({ page }) => {
+    await page.goto("/home");
+    const dismissButton = page
+      .getByRole("button", { name: /Not interested in Senior Frontend Engineer/ })
+      .first();
+    await dismissButton.click();
+    await expect(page.getByText("Couldn't dismiss this", { exact: true })).toBeVisible();
   });
 
   test("job details shows a deterministic skill match card alongside AI analysis", async ({ page }) => {
@@ -27,5 +41,10 @@ test.describe("Job Search Operating System features (demo mode)", () => {
   test("job details links out to the original posting for externally sourced jobs", async ({ page }) => {
     await page.goto("/jobs/job-1");
     await expect(page.getByRole("link", { name: /View original posting/ })).toHaveCount(0);
+  });
+
+  test("resume page shows performance stats derived from application outcomes", async ({ page }) => {
+    await page.goto("/resume");
+    await expect(page.getByText(/applications? · \d+% interview rate/)).toBeVisible();
   });
 });

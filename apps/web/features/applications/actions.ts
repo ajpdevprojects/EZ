@@ -22,7 +22,10 @@ export async function applyToJobAction(jobId: string): Promise<ApplyToJobResult>
 
   if (!user) return { error: "Your session expired — please sign in again." };
 
-  const { data: job } = await supabase.from("jobs").select("title, company").eq("id", jobId).maybeSingle();
+  const [{ data: job }, { data: primaryResume }] = await Promise.all([
+    supabase.from("jobs").select("title, company").eq("id", jobId).maybeSingle(),
+    supabase.from("resumes").select("id").eq("user_id", user.id).eq("is_primary", true).maybeSingle(),
+  ]);
 
   const { data: existing } = await supabase
     .from("applications")
@@ -38,7 +41,7 @@ export async function applyToJobAction(jobId: string): Promise<ApplyToJobResult>
 
     const { error } = await supabase
       .from("applications")
-      .update({ status: "applied", applied_at: new Date().toISOString() })
+      .update({ status: "applied", applied_at: new Date().toISOString(), resume_id: primaryResume?.id ?? null })
       .eq("id", existing.id);
 
     if (error) return { error: error.message };
@@ -51,6 +54,7 @@ export async function applyToJobAction(jobId: string): Promise<ApplyToJobResult>
         job_id: jobId,
         status: "applied",
         applied_at: new Date().toISOString(),
+        resume_id: primaryResume?.id ?? null,
       })
       .select("id")
       .single();

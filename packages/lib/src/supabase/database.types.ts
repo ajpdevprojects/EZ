@@ -61,6 +61,7 @@ export interface Database {
           match_reason: string | null;
           applied_at: string | null;
           notes: string | null;
+          resume_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -244,6 +245,28 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["user_integrations"]["Row"]>;
         Relationships: [];
+      };
+      dismissed_jobs: {
+        Row: {
+          id: string;
+          user_id: string;
+          job_id: string;
+          dismissed_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["dismissed_jobs"]["Row"]> & {
+          user_id: string;
+          job_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["dismissed_jobs"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "dismissed_jobs_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       job_ingestion_runs: {
         Row: {

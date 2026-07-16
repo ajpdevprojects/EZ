@@ -15,6 +15,8 @@ import type {
 } from "@ez/types";
 import { createEmptyResumeContent } from "@ez/types";
 import { rankJobsForProfile } from "./job-matching";
+import { computeLearnedPreferences } from "./learning";
+import { buildDailyPriorities, getStaleApplications } from "./mission-control";
 
 /**
  * Demo data used when Supabase has not been configured, so the product
@@ -144,6 +146,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     matchReason: "Your Figma and design systems experience closely match this role.",
     appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     notes: null,
+    resumeId: "resume-1",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     job: DEMO_JOBS[0],
@@ -157,6 +160,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     matchReason: "Strong overlap with your design systems background.",
     appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
     notes: null,
+    resumeId: "resume-1",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
     job: DEMO_JOBS[1],
@@ -170,6 +174,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     matchReason: "Matches your interest in design systems work.",
     appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
     notes: null,
+    resumeId: "resume-1",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
     job: DEMO_JOBS[2],
@@ -183,6 +188,7 @@ export const DEMO_APPLICATIONS: Application[] = [
     matchReason: "Your product strategy experience was a strong match.",
     appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
     notes: null,
+    resumeId: "resume-1",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
     job: DEMO_JOBS[4],
@@ -631,7 +637,12 @@ export function createEmptyDemoResume(title: string): Resume {
   };
 }
 
+const DAILY_RECOMMENDATION_LIMIT = 15;
+const INTERVIEW_PREP_WINDOW_MS = 1000 * 60 * 60 * 48;
+
 export function getDemoDailyBriefing(): DailyBriefing {
+  const now = new Date();
+
   const applicationsInProgress = DEMO_APPLICATIONS.filter(
     (application) => application.status === "applied" || application.status === "interviewing",
   ).length;
@@ -639,8 +650,37 @@ export function getDemoDailyBriefing(): DailyBriefing {
     (application) => application.status === "interviewing",
   ).length;
 
+  const appliedJobIds = new Set(DEMO_APPLICATIONS.map((application) => application.jobId));
   const resumeSkills = DEMO_RESUMES[0]?.content.skills ?? [];
-  const recommended = rankJobsForProfile(DEMO_JOBS, DEMO_PROFILE, resumeSkills).slice(0, 3);
+  const learned = computeLearnedPreferences(DEMO_APPLICATIONS);
+  const recommended = rankJobsForProfile(
+    DEMO_JOBS.filter((job) => !appliedJobIds.has(job.id)),
+    DEMO_PROFILE,
+    resumeSkills,
+    learned,
+  ).slice(0, DAILY_RECOMMENDATION_LIMIT);
+
+  const unreadRecruiterEmailCount = DEMO_RECRUITER_EMAILS.filter((email) => !email.readAt).length;
+  const staleApplicationCount = getStaleApplications(DEMO_APPLICATIONS, now).length;
+
+  const upcomingInterviews = DEMO_INTERVIEWS.filter((interview) => {
+    if (interview.status !== "scheduled") return false;
+    const diff = new Date(interview.scheduledAt).getTime() - now.getTime();
+    return diff >= 0 && diff <= INTERVIEW_PREP_WINDOW_MS;
+  }).map((interview) => ({
+    id: interview.id,
+    jobTitle: interview.application?.job?.title ?? "Interview",
+    company: interview.application?.job?.company ?? "",
+    scheduledAt: interview.scheduledAt,
+  }));
+
+  const dailyPriorities = buildDailyPriorities({
+    hasPrimaryResume: DEMO_RESUMES.some((resume) => resume.isPrimary),
+    unreadRecruiterEmailCount,
+    upcomingInterviews,
+    staleApplicationCount,
+    topOpportunityCount: recommended.filter((entry) => entry.match.score >= 60).length,
+  });
 
   return {
     greetingName: DEMO_PROFILE.fullName ?? "there",
@@ -650,6 +690,8 @@ export function getDemoDailyBriefing(): DailyBriefing {
     recommendedMatches: Object.fromEntries(
       recommended.map((entry) => [entry.job.id, { score: entry.match.score, reasons: entry.match.reasons }]),
     ),
-    nextAction: "Review your UI/UX Designer interview prep for Vertex.",
+    dailyPriorities,
+    unreadRecruiterEmailCount,
+    upcomingInterviews,
   };
 }

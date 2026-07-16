@@ -96,6 +96,7 @@ export function mapApplication(row: ApplicationRow, job?: JobRow): Application {
     matchReason: row.match_reason,
     appliedAt: row.applied_at,
     notes: row.notes,
+    resumeId: row.resume_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     job: job ? mapJob(job) : undefined,

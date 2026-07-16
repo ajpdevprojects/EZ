@@ -12,6 +12,7 @@ function makeApplication(overrides: Partial<Application>): Application {
     matchReason: null,
     appliedAt: null,
     notes: null,
+    resumeId: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,

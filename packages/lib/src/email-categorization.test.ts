@@ -47,6 +47,7 @@ describe("findLikelyApplication", () => {
       matchReason: null,
       appliedAt: null,
       notes: null,
+      resumeId: null,
       createdAt: "",
       updatedAt: "",
       job: {

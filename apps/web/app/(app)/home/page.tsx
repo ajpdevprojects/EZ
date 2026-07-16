@@ -1,8 +1,9 @@
+import { DailyPriorities } from "@/features/home/components/daily-priorities";
+import { OpportunityList } from "@/features/home/components/opportunity-list";
 import { QuickLinks } from "@/features/home/components/quick-links";
-import { JobCard } from "@/features/jobs/components/job-card";
 import { getCurrentSession } from "@/lib/session";
 import { getDailyBriefing } from "@/features/home/data";
-import { StatTile } from "@ez/ui";
+import { EmptyState, StatTile } from "@ez/ui";
 import { Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -26,33 +27,27 @@ export default async function HomePage() {
         <StatTile label="Interviews" value={briefing.interviewsUpcoming} />
       </div>
 
-      {briefing.nextAction && (
-        <div className="flex items-start gap-3 rounded-3xl border border-primary/30 bg-primary/10 p-4">
-          <Sparkles className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
-          <div className="flex flex-col gap-0.5">
-            <p className="text-sm font-medium text-foreground">Today&apos;s next step</p>
-            <p className="text-sm text-muted-foreground">{briefing.nextAction}</p>
-          </div>
-        </div>
-      )}
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-lg font-semibold text-foreground">Today&apos;s priorities</h2>
+        <DailyPriorities priorities={briefing.dailyPriorities} />
+      </section>
 
       <QuickLinks />
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-display text-lg font-semibold text-foreground">Recommended for you</h2>
-        <div className="flex flex-col gap-3">
-          {briefing.recommendedJobs.map((job) => {
-            const match = briefing.recommendedMatches[job.id];
-            return (
-              <JobCard
-                key={job.id}
-                job={job}
-                matchScore={match?.score}
-                matchReason={match?.reasons[0]}
-              />
-            );
-          })}
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" aria-hidden="true" />
+          <h2 className="font-display text-lg font-semibold text-foreground">Today&apos;s opportunities</h2>
         </div>
+        {briefing.recommendedJobs.length === 0 ? (
+          <EmptyState
+            icon={<Sparkles className="size-6" aria-hidden="true" />}
+            title="No new opportunities right now"
+            description="Check back soon — I'm continuously discovering new roles for you."
+          />
+        ) : (
+          <OpportunityList jobs={briefing.recommendedJobs} matches={briefing.recommendedMatches} />
+        )}
       </section>
     </main>
   );

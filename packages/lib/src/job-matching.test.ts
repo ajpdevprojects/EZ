@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rankJobsForProfile, scoreJobForProfile } from "./job-matching";
+import type { LearnedPreferences } from "./learning";
 import type { Job, Profile } from "@ez/types";
 
 function makeJob(overrides: Partial<Job> = {}): Job {
@@ -43,13 +44,16 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
   };
 }
 
+const FACTOR_BUDGET_BEHAVIORAL = 15;
+
 describe("scoreJobForProfile", () => {
   it("scores highly when skills, work type, location, and role all align", () => {
     const job = makeJob();
     const profile = makeProfile();
     const result = scoreJobForProfile(job, profile, ["React", "TypeScript", "Next.js"]);
 
-    expect(result.score).toBeGreaterThanOrEqual(90);
+    expect(result.score).toBeGreaterThanOrEqual(80);
+    expect(result.confidenceLabel).toBe("Strong match");
     expect(result.matchedSkills).toEqual(["React", "TypeScript", "Next.js"]);
     expect(result.missingSkills).toEqual([]);
   });
@@ -87,6 +91,58 @@ describe("scoreJobForProfile", () => {
     const result = scoreJobForProfile(job, profile, ["React", "TypeScript", "Next.js", "Extra"]);
     expect(result.score).toBeLessThanOrEqual(100);
     expect(result.score).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns a transparent factor breakdown that sums to the total score", () => {
+    const job = makeJob();
+    const profile = makeProfile();
+    const result = scoreJobForProfile(job, profile, ["React"]);
+
+    const total = result.factors.reduce((sum, factor) => sum + factor.points, 0);
+    expect(total).toBe(result.score);
+    expect(result.factors.map((factor) => factor.key)).toEqual([
+      "skills",
+      "workType",
+      "location",
+      "role",
+      "behavioral",
+    ]);
+  });
+
+  it("reports a neutral behavioral factor with no history", () => {
+    const result = scoreJobForProfile(makeJob(), makeProfile(), ["React"]);
+    const behavioral = result.factors.find((factor) => factor.key === "behavioral");
+    expect(behavioral?.points).toBe(0);
+    expect(behavioral?.detail).toMatch(/not enough application history/i);
+  });
+
+  it("boosts the behavioral factor when learned preferences favor the job's skills", () => {
+    const learned: LearnedPreferences = {
+      skillAffinity: { react: 1, typescript: 1, "next.js": 1 },
+      workTypeAffinity: { full_time: 1 },
+      remoteAffinity: 1,
+      salarySweetSpot: null,
+      sampleSize: 5,
+    };
+    const withHistory = scoreJobForProfile(makeJob(), makeProfile(), ["React"], learned);
+    const withoutHistory = scoreJobForProfile(makeJob(), makeProfile(), ["React"]);
+
+    const behavioralWith = withHistory.factors.find((factor) => factor.key === "behavioral");
+    const behavioralWithout = withoutHistory.factors.find((factor) => factor.key === "behavioral");
+    expect(behavioralWith!.points).toBeGreaterThan(behavioralWithout!.points);
+  });
+
+  it("lowers the behavioral factor when learned preferences disfavor the job's skills", () => {
+    const learned: LearnedPreferences = {
+      skillAffinity: { react: -1, typescript: -1, "next.js": -1 },
+      workTypeAffinity: {},
+      remoteAffinity: 0,
+      salarySweetSpot: null,
+      sampleSize: 3,
+    };
+    const result = scoreJobForProfile(makeJob(), makeProfile(), ["React"], learned);
+    const behavioral = result.factors.find((factor) => factor.key === "behavioral");
+    expect(behavioral!.points).toBeLessThan(FACTOR_BUDGET_BEHAVIORAL / 2);
   });
 });
 

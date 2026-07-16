@@ -5,17 +5,19 @@ Canon and the Product Directive, and what remains external to the
 codebase. Update this alongside future milestones (Release Engineering
 Canon: release documentation).
 
-## Architecture: Software Engine + AI Engine
+## Architecture: Software Brain + AI Brain
 
 Per the Product Directive, EZ is built around two cooperating systems:
 
-- **Brain 1 — Software Engine.** Deterministic, no AI: job discovery and
-  ingestion, dedupe, deterministic job-fit scoring and skill-gap analysis,
-  the application pipeline, company workspaces, the recruiter inbox
-  categorizer, notifications, analytics, and scheduling. Lives mostly in
-  `packages/lib` (pure functions, unit tested) with thin persistence in
-  `apps/web/features/*/data.ts`.
-- **Brain 2 — AI Engine.** Enhancement only, never a dependency: job-fit
+- **Software Brain.** The primary intelligence of the platform —
+  deterministic, no AI: job discovery and ingestion, dedupe, confidence
+  scoring and skill-gap analysis, continuous behavioral learning from the
+  user's own outcomes, the application pipeline, company workspaces, the
+  recruiter inbox categorizer, notifications, analytics, and scheduling.
+  Lives mostly in `packages/lib` (pure functions, unit tested) with thin
+  persistence in `apps/web/features/*/data.ts`. AI never replaces this —
+  it only reasons on top of what the Software Brain already decided.
+- **AI Brain.** Enhancement only, never a dependency: job-fit
   reasoning/explanation, resume feedback, cover letter drafting, recruiter
   reply drafting, interview prep. Every AI-backed action has a
   `generateElizabethText`/`generateText` call that returns `null` when no
@@ -25,15 +27,62 @@ Per the Product Directive, EZ is built around two cooperating systems:
   which runs with no `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/
   `GOOGLE_GENERATIVE_AI_API_KEY` set.
 
+### Continuous learning (Software Brain, no AI)
+
+The system gets more valuable the longer it's used, entirely through
+deterministic signal processing:
+
+- **`packages/lib/src/learning.ts`** — `computeLearnedPreferences` derives
+  skill / work-type / remote / salary-range affinities from the outcomes
+  a user has already produced: interviews, offers, and hires push a
+  skill's weight up; rejections and dismissed recommendations push it
+  down. No two users converge on the same weights because the input is
+  entirely their own history.
+- **Confidence scoring** (`packages/lib/src/job-matching.ts`) — every
+  recommendation carries a transparent, itemized breakdown
+  (`ConfidenceFactor[]`: skill match, work type, location, role alignment,
+  and a "your history" factor fed by the learned preferences above) so
+  the user always understands *why* a job was recommended, exactly as the
+  directive requires. The "your history" factor is neutral until there's
+  at least one outcome to learn from — it never fabricates a signal.
+- **Dismissing a recommendation** (`dismissJobRecommendationAction`,
+  `dismissed_jobs` table) is a deliberate negative signal: dismissed jobs'
+  skills feed back into `computeLearnedPreferences` immediately, so
+  similar roles are deprioritized on the next visit — no AI, no delay.
+- **Resume performance** (`packages/lib/src/resume-performance.ts`) —
+  every application records which resume (`applications.resume_id`) was
+  used; the Resume System page shows each resume's application count and
+  interview rate so a user can see which version is actually working.
+
+### Mission Control (Home)
+
+Home answers "what should I work on today?" instead of showing
+disconnected widgets, per the directive:
+
+- **Today's priorities** (`packages/lib/src/mission-control.ts`,
+  `buildDailyPriorities`) — a goal-driven, ordered list: build a resume if
+  missing, prepare for interviews within 48 hours, review unread recruiter
+  replies, follow up on applications stalled 14+ days, then apply to
+  today's top matches. Falls back to a calm "you're all caught up"
+  message when nothing needs attention — the dashboard never manufactures
+  urgency.
+- **Today's opportunities** — up to 15 confidence-scored, ranked jobs
+  (quality over quantity, per the directive's "recommend the best 10–20"
+  guidance), already excluding jobs the user applied to or dismissed. The
+  first 5 show by default with a "show more" expansion so Home stays calm
+  on first load, per the Experience Canon's "never overwhelmed"; every
+  card carries its match score, top reason, and a one-click dismiss.
+
 ## Delivered
 
 ### Foundation
 
 - **Monorepo** — Turborepo + pnpm workspaces: `apps/web` (Next.js 16 /
   React 19), `packages/ui` (design system), `packages/lib` (Supabase
-  clients, AI provider abstraction, job discovery, matching, validation,
-  analytics, journey logic, ICS generation, utils), `packages/types`
-  (shared domain types).
+  clients, AI provider abstraction, job discovery, confidence-scored
+  matching, behavioral learning, mission control priorities, resume
+  performance, validation, analytics, journey logic, ICS generation,
+  utils), `packages/types` (shared domain types).
 - **Design system** — Tailwind v4 tokens matching the Design Canon.
   Primitives (Button, Input, Select, Card, Badge, Chip, Checkbox, Switch,
   Tabs, Avatar, Divider, Skeleton) and shared components (BottomNav,
@@ -59,9 +108,9 @@ Per the Product Directive, EZ is built around two cooperating systems:
 | Stage | Status | Where |
 |---|---|---|
 | Find & collect jobs | **Built** | Software Engine ingestion from RemoteOK + Remotive public APIs |
-| Filter jobs | **Built** | Deterministic `rankJobsForProfile`/`scoreJobForProfile` |
+| Filter jobs | **Built** | Deterministic `rankJobsForProfile`/`scoreJobForProfile`, learning-adjusted |
 | Analyze jobs | **Built** | AI job-fit reasoning on top of the deterministic shortlist |
-| Recommend jobs | **Built** | Home "Recommended for you", ranked and reasoned |
+| Recommend jobs | **Built** | Mission Control Home — confidence-scored, capped at 15, dismissible |
 | Generate resume | **Built** | Resume System + AI feedback |
 | Generate cover letter | **Built** | Documents Center, one-click tailored drafting |
 | User review & approval | **Built** | Every AI draft is copy/edit-before-send; Apply requires an explicit click |
@@ -116,12 +165,12 @@ demo-able end to end.
 
 ### Core experience & Platform Completion features
 
-- **Home (Daily Briefing)**, **Search**, **Job Details** (AI match
+- **Home (Mission Control)**, **Search**, **Job Details** (AI match
   analysis + deterministic skill-gap + apply flow + external-posting
   link for sourced jobs), **Applications Pipeline**, **Ask EZ**, and a
   **Profile** hub linking every feature area.
 - **Resume System** (`/resume`) — multiple resumes, full editor, AI
-  feedback.
+  feedback, per-resume performance stats (applications / interview rate).
 - **Documents Center** (`/documents`) — cover letter CRUD, tailored AI
   drafting, Supabase Storage uploads (Drive substitute).
 - **Interview Center** (`/interviews`) — schedule/cancel/complete, prep
@@ -145,16 +194,18 @@ demo-able end to end.
 
 ### Tests
 
-- **116 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
+- **143 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
   (Vitest) covering validation, journey logic, analytics, ICS generation,
   AI prompt/response parsing, job discovery (sources, normalize, dedupe,
-  ingest orchestration), deterministic job matching, skill-gap analysis,
-  email categorization, cron auth, and UI primitives/components.
-- **21 Playwright e2e tests** (`apps/web/e2e`) against a production build
-  in demo mode — the full golden path plus every feature screen: resumes,
-  interviews, coach, journey, learning, documents, inbox, notifications,
-  analytics, integrations, company workspace, job match analysis +
-  skill-gap, and profile navigation.
+  ingest orchestration), confidence scoring, behavioral learning, mission
+  control priorities, resume performance, skill-gap analysis, email
+  categorization, cron auth, and UI primitives/components.
+- **24 Playwright e2e tests** (`apps/web/e2e`) against a production build
+  in demo mode — the full golden path plus every feature screen: resumes
+  (with performance stats), interviews, coach, journey, learning,
+  documents, inbox, notifications, analytics, integrations, company
+  workspace, Mission Control priorities, confidence-scored recommendations
+  + dismissal, job match analysis + skill-gap, and profile navigation.
 - GitHub Actions CI runs lint, typecheck, unit tests, build, and e2e on
   every push/PR.
 

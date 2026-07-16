@@ -67,6 +67,7 @@ export interface Application {
   matchReason: string | null;
   appliedAt: string | null;
   notes: string | null;
+  resumeId: string | null;
   createdAt: string;
   updatedAt: string;
   job?: Job;
@@ -139,13 +140,30 @@ export interface JobMatchSummary {
   reasons: string[];
 }
 
+export interface DailyPriorityItem {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  urgent: boolean;
+}
+
+export interface UpcomingInterviewSummary {
+  id: string;
+  jobTitle: string;
+  company: string;
+  scheduledAt: string;
+}
+
 export interface DailyBriefing {
   greetingName: string;
   applicationsInProgress: number;
   interviewsUpcoming: number;
   recommendedJobs: Job[];
   recommendedMatches: Record<string, JobMatchSummary>;
-  nextAction: string | null;
+  dailyPriorities: DailyPriorityItem[];
+  unreadRecruiterEmailCount: number;
+  upcomingInterviews: UpcomingInterviewSummary[];
 }
 
 // ---------------------------------------------------------------------
