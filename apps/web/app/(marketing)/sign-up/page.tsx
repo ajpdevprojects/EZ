@@ -1,8 +1,17 @@
 import { SignUpForm } from "@/features/auth/components/sign-up-form";
+import { getCurrentSession } from "@/lib/session";
 import { EzWordmark } from "@ez/ui";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function SignUpPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SignUpPage() {
+  const session = await getCurrentSession();
+  if (session && !session.isDemo) {
+    redirect(session.profile.onboardingCompletedAt ? "/home" : "/onboarding");
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-6 py-12">
       <div className="flex flex-col items-center gap-2 text-center">

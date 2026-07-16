@@ -10,6 +10,7 @@ import { signUpAction } from "../actions";
 
 export function SignUpForm() {
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [formMessage, setFormMessage] = React.useState<string | null>(null);
 
   const {
     register,
@@ -22,8 +23,10 @@ export function SignUpForm() {
 
   async function onSubmit(data: SignUpInput) {
     setFormError(null);
+    setFormMessage(null);
     const result = await signUpAction(data);
     if (result?.error) setFormError(result.error);
+    else if (result?.message) setFormMessage(result.message);
   }
 
   return (
@@ -88,6 +91,12 @@ export function SignUpForm() {
       {formError && (
         <p role="alert" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {formError}
+        </p>
+      )}
+
+      {formMessage && (
+        <p role="status" className="rounded-2xl bg-primary/10 px-4 py-3 text-sm text-primary">
+          {formMessage}
         </p>
       )}
 

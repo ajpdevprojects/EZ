@@ -1,6 +1,10 @@
+import { getCurrentSession } from "@/lib/session";
 import { Button, EzWordmark } from "@ez/ui";
 import { Briefcase, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 const VALUE_PROPS = [
   {
@@ -20,7 +24,15 @@ const VALUE_PROPS = [
   },
 ];
 
-export default function WelcomePage() {
+export default async function WelcomePage() {
+  // Demo mode's session is a permanent stand-in, not a real signed-in user —
+  // it must keep landing here so the product can be explored without
+  // credentials. Only bounce someone with a genuine Supabase session.
+  const session = await getCurrentSession();
+  if (session && !session.isDemo) {
+    redirect(session.profile.onboardingCompletedAt ? "/home" : "/onboarding");
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-between gap-10 px-6 py-12">
       <div className="flex flex-col items-center gap-6 text-center">

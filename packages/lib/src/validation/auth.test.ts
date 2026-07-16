@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signInSchema, signUpSchema } from "./auth";
+import { forgotPasswordSchema, resetPasswordSchema, signInSchema, signUpSchema } from "./auth";
 
 describe("signInSchema", () => {
   it("accepts a valid sign-in payload", () => {
@@ -50,6 +50,42 @@ describe("signUpSchema", () => {
   it("rejects short passwords", () => {
     const result = signUpSchema.safeParse({
       ...basePayload,
+      password: "short",
+      confirmPassword: "short",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("forgotPasswordSchema", () => {
+  it("accepts a valid email", () => {
+    expect(forgotPasswordSchema.safeParse({ email: "alex@example.com" }).success).toBe(true);
+  });
+
+  it("rejects an invalid email", () => {
+    expect(forgotPasswordSchema.safeParse({ email: "not-an-email" }).success).toBe(false);
+  });
+});
+
+describe("resetPasswordSchema", () => {
+  it("accepts a valid payload", () => {
+    const result = resetPasswordSchema.safeParse({
+      password: "supersecret",
+      confirmPassword: "supersecret",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects mismatched passwords", () => {
+    const result = resetPasswordSchema.safeParse({
+      password: "supersecret",
+      confirmPassword: "different",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects short passwords", () => {
+    const result = resetPasswordSchema.safeParse({
       password: "short",
       confirmPassword: "short",
     });
