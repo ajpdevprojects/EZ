@@ -11,7 +11,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const { messages } = await request.json();
+  let messages: unknown[];
+  try {
+    ({ messages } = await request.json());
+    if (!Array.isArray(messages)) throw new Error("messages must be an array");
+  } catch {
+    return Response.json({ error: "Malformed request body." }, { status: 400 });
+  }
 
   return createAgentUIStreamResponse({ agent, uiMessages: messages });
 }
