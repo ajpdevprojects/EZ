@@ -3,24 +3,33 @@ import { Sparkles } from "lucide-react";
 
 export function MorningGreeting({
   greetingName,
-  newOpportunitiesCount,
+  jobsDiscoveredGlobally,
+  duplicatesRemovedGlobally,
+  jobsShortlistedCount,
   topOpportunity,
   upcomingInterviewCount,
+  newInterviewsScheduledCount,
   staleApplicationCount,
   unreadRecruiterEmailCount,
 }: {
   greetingName: string;
-  newOpportunitiesCount: number;
+  jobsDiscoveredGlobally: number;
+  duplicatesRemovedGlobally: number;
+  jobsShortlistedCount: number;
   topOpportunity: { title: string; company: string; score: number } | null;
   upcomingInterviewCount: number;
+  newInterviewsScheduledCount: number;
   staleApplicationCount: number;
   unreadRecruiterEmailCount: number;
 }) {
   const summary = buildDailyBriefingSummary({
     greetingName,
-    newJobsCount: newOpportunitiesCount,
+    jobsDiscoveredGlobally,
+    duplicatesRemovedGlobally,
+    jobsShortlistedCount,
     topOpportunity,
     upcomingInterviewCount,
+    newInterviewsScheduledCount,
     staleApplicationCount,
     unreadRecruiterEmailCount,
   });

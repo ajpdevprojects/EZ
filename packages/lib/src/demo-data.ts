@@ -683,8 +683,12 @@ export function getDemoDailyBriefing(): DailyBriefing {
     topOpportunityCount: recommended.filter((entry) => entry.match.score >= 60).length,
   });
 
-  const newOpportunitiesCount = recommended.filter(
-    (entry) => now.getTime() - new Date(entry.job.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
+  const jobsDiscoveredGlobally = DEMO_JOBS.filter(
+    (job) => now.getTime() - new Date(job.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
+  ).length;
+  const duplicatesRemovedGlobally = 0;
+  const newInterviewsScheduledCount = DEMO_INTERVIEWS.filter(
+    (interview) => now.getTime() - new Date(interview.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
   ).length;
 
   return {
@@ -698,7 +702,9 @@ export function getDemoDailyBriefing(): DailyBriefing {
     dailyPriorities,
     unreadRecruiterEmailCount,
     upcomingInterviews,
-    newOpportunitiesCount,
     staleApplicationCount,
+    jobsDiscoveredGlobally,
+    duplicatesRemovedGlobally,
+    newInterviewsScheduledCount,
   };
 }

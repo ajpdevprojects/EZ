@@ -12,9 +12,18 @@ export interface JobCardProps {
   onDismiss?: (jobId: string) => void;
   matchScore?: number;
   matchReason?: string;
+  priorityRank?: number;
 }
 
-export function JobCard({ job, saved = false, onToggleSave, onDismiss, matchScore, matchReason }: JobCardProps) {
+export function JobCard({
+  job,
+  saved = false,
+  onToggleSave,
+  onDismiss,
+  matchScore,
+  matchReason,
+  priorityRank,
+}: JobCardProps) {
   const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
 
   return (
@@ -57,6 +66,7 @@ export function JobCard({ job, saved = false, onToggleSave, onDismiss, matchScor
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
+          {typeof priorityRank === "number" && <Badge variant="offer">Priority #{priorityRank}</Badge>}
           <Badge variant="neutral">{EMPLOYMENT_TYPE_LABEL[job.employmentType]}</Badge>
           {job.seniorityLevel && <Badge variant="neutral">{SENIORITY_LABEL[job.seniorityLevel]}</Badge>}
           {typeof matchScore === "number" && <Badge variant="recommended">{matchScore}% match</Badge>}

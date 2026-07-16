@@ -13,6 +13,7 @@ export interface IngestSummary {
   jobsCreated: number;
   jobsUpdated: number;
   jobsArchived: number;
+  jobsDuplicatesRemoved: number;
   error: string | null;
 }
 
@@ -52,6 +53,7 @@ async function ingestFromSource(
   try {
     const rawJobs = await source.fetchJobs();
     const jobs = dedupeNormalizedJobs(rawJobs);
+    const jobsDuplicatesRemoved = rawJobs.length - jobs.length;
     const seenAt = new Date().toISOString();
 
     const sourceIds = jobs.map((job) => job.sourceId);
@@ -88,12 +90,21 @@ async function ingestFromSource(
           jobs_created: jobsCreated,
           jobs_updated: jobsUpdated,
           jobs_archived: jobsArchived,
+          jobs_duplicates_removed: jobsDuplicatesRemoved,
           completed_at: new Date().toISOString(),
         })
         .eq("id", run.id);
     }
 
-    return { source: source.id, jobsFound: jobs.length, jobsCreated, jobsUpdated, jobsArchived, error: null };
+    return {
+      source: source.id,
+      jobsFound: jobs.length,
+      jobsCreated,
+      jobsUpdated,
+      jobsArchived,
+      jobsDuplicatesRemoved,
+      error: null,
+    };
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Unknown ingestion error";
 
@@ -104,7 +115,15 @@ async function ingestFromSource(
         .eq("id", run.id);
     }
 
-    return { source: source.id, jobsFound: 0, jobsCreated: 0, jobsUpdated: 0, jobsArchived: 0, error: message };
+    return {
+      source: source.id,
+      jobsFound: 0,
+      jobsCreated: 0,
+      jobsUpdated: 0,
+      jobsArchived: 0,
+      jobsDuplicatesRemoved: 0,
+      error: message,
+    };
   }
 }
 

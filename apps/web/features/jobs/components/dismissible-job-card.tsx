@@ -10,10 +10,12 @@ export function DismissibleJobCard({
   job,
   matchScore,
   matchReason,
+  priorityRank,
 }: {
   job: Job;
   matchScore?: number;
   matchReason?: string;
+  priorityRank?: number;
 }) {
   const [isDismissed, setIsDismissed] = React.useState(false);
   const [, startTransition] = React.useTransition();
@@ -33,5 +35,13 @@ export function DismissibleJobCard({
 
   if (isDismissed) return null;
 
-  return <JobCard job={job} matchScore={matchScore} matchReason={matchReason} onDismiss={handleDismiss} />;
+  return (
+    <JobCard
+      job={job}
+      matchScore={matchScore}
+      matchReason={matchReason}
+      priorityRank={priorityRank}
+      onDismiss={handleDismiss}
+    />
+  );
 }

@@ -164,8 +164,10 @@ export interface DailyBriefing {
   dailyPriorities: DailyPriorityItem[];
   unreadRecruiterEmailCount: number;
   upcomingInterviews: UpcomingInterviewSummary[];
-  newOpportunitiesCount: number;
   staleApplicationCount: number;
+  jobsDiscoveredGlobally: number;
+  duplicatesRemovedGlobally: number;
+  newInterviewsScheduledCount: number;
 }
 
 // ---------------------------------------------------------------------

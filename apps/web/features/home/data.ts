@@ -32,7 +32,7 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
 
   const now = new Date();
 
-  const [applications, interviews, resumes, dismissedJobs, unreadRecruiterEmailCount, { data: jobRows }] =
+  const [applications, interviews, resumes, dismissedJobs, unreadRecruiterEmailCount, { data: jobRows }, { data: ingestionRuns }] =
     await Promise.all([
       getMyApplications(profile.id, false),
       getMyInterviews(profile.id, false),
@@ -40,6 +40,11 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
       getDismissedJobs(profile.id, false),
       getUnreadRecruiterEmailCount(profile.id, false),
       supabase.from("jobs").select("*").eq("is_active", true).order("posted_at", { ascending: false }).limit(500),
+      supabase
+        .from("job_ingestion_runs")
+        .select("jobs_created, jobs_duplicates_removed")
+        .eq("status", "succeeded")
+        .gte("started_at", new Date(now.getTime() - NEW_JOB_WINDOW_MS).toISOString()),
     ]);
 
   const applicationsInProgress = applications.filter(
@@ -86,8 +91,11 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
     topOpportunityCount: recommended.filter((entry) => entry.match.score >= 60).length,
   });
 
-  const newOpportunitiesCount = recommended.filter(
-    (entry) => now.getTime() - new Date(entry.job.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
+  const jobsDiscoveredGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_created, 0);
+  const duplicatesRemovedGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_duplicates_removed, 0);
+
+  const newInterviewsScheduledCount = interviews.filter(
+    (interview) => now.getTime() - new Date(interview.createdAt).getTime() <= NEW_JOB_WINDOW_MS,
   ).length;
 
   return {
@@ -101,7 +109,9 @@ export async function getDailyBriefing(profile: Profile, isDemo: boolean): Promi
     dailyPriorities,
     unreadRecruiterEmailCount,
     upcomingInterviews,
-    newOpportunitiesCount,
     staleApplicationCount,
+    jobsDiscoveredGlobally,
+    duplicatesRemovedGlobally,
+    newInterviewsScheduledCount,
   };
 }

@@ -5,9 +5,12 @@ import type { DailyBriefingSummaryInput, DailyNotificationPlanInput } from "./da
 function makeSummaryInput(overrides: Partial<DailyBriefingSummaryInput> = {}): DailyBriefingSummaryInput {
   return {
     greetingName: "Alex",
-    newJobsCount: 0,
+    jobsDiscoveredGlobally: 0,
+    duplicatesRemovedGlobally: 0,
+    jobsShortlistedCount: 0,
     topOpportunity: null,
     upcomingInterviewCount: 0,
+    newInterviewsScheduledCount: 0,
     staleApplicationCount: 0,
     unreadRecruiterEmailCount: 0,
     ...overrides,
@@ -15,25 +18,34 @@ function makeSummaryInput(overrides: Partial<DailyBriefingSummaryInput> = {}): D
 }
 
 describe("buildDailyBriefingSummary", () => {
-  it("falls back to a calm message when nothing needs attention", () => {
+  it("falls back to an honest calm message when nothing needs attention", () => {
     const summary = buildDailyBriefingSummary(makeSummaryInput());
     expect(summary.greeting).toBe("Good morning, Alex.");
-    expect(summary.highlights).toEqual(["Everything is quiet right now — check back soon for new opportunities."]);
+    expect(summary.highlights).toEqual([
+      "Nothing urgent today — no new opportunities matched your profile overnight, and everything else is quiet.",
+    ]);
   });
 
-  it("never fabricates a new-jobs highlight when the count is zero", () => {
-    const summary = buildDailyBriefingSummary(makeSummaryInput({ newJobsCount: 0, unreadRecruiterEmailCount: 1 }));
-    expect(summary.highlights.some((h) => h.includes("new"))).toBe(false);
+  it("never fabricates overnight discovery when nothing was found", () => {
+    const summary = buildDailyBriefingSummary(makeSummaryInput({ unreadRecruiterEmailCount: 1 }));
+    expect(summary.highlights.some((h) => h.includes("searched job sources"))).toBe(false);
   });
 
-  it("reports new opportunities discovered", () => {
-    const summary = buildDailyBriefingSummary(makeSummaryInput({ newJobsCount: 3 }));
-    expect(summary.highlights[0]).toBe("I found 3 new opportunities since yesterday.");
+  it("reports overnight discovery including duplicates removed", () => {
+    const summary = buildDailyBriefingSummary(
+      makeSummaryInput({ jobsDiscoveredGlobally: 12, duplicatesRemovedGlobally: 3 }),
+    );
+    expect(summary.highlights[0]).toBe("Overnight, I searched job sources and found 12 new listings, removing 3 duplicates.");
   });
 
-  it("uses singular phrasing for a single new job", () => {
-    const summary = buildDailyBriefingSummary(makeSummaryInput({ newJobsCount: 1 }));
-    expect(summary.highlights[0]).toBe("I found 1 new opportunity since yesterday.");
+  it("omits the duplicates clause when none were removed", () => {
+    const summary = buildDailyBriefingSummary(makeSummaryInput({ jobsDiscoveredGlobally: 5 }));
+    expect(summary.highlights[0]).toBe("Overnight, I searched job sources and found 5 new listings.");
+  });
+
+  it("reports how many opportunities were shortlisted", () => {
+    const summary = buildDailyBriefingSummary(makeSummaryInput({ jobsShortlistedCount: 4 }));
+    expect(summary.highlights).toContain("I shortlisted 4 opportunities for you today.");
   });
 
   it("reports the top opportunity with its confidence score", () => {
@@ -41,6 +53,11 @@ describe("buildDailyBriefingSummary", () => {
       makeSummaryInput({ topOpportunity: { title: "Product Designer", company: "Acme", score: 91 } }),
     );
     expect(summary.highlights).toContain("Your top match today is Product Designer at Acme (91% confidence).");
+  });
+
+  it("reports new interviews scheduled since yesterday", () => {
+    const summary = buildDailyBriefingSummary(makeSummaryInput({ newInterviewsScheduledCount: 1 }));
+    expect(summary.highlights).toContain("1 new interview was scheduled since yesterday.");
   });
 
   it("reports upcoming interviews, stale applications, and unread recruiter emails together", () => {

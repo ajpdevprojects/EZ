@@ -79,8 +79,17 @@ user has to fill by acting first:
      keyed by job id, by day, or by a cooldown window — so the job is
      safe to run on every scheduled tick without ever repeating itself or
      becoming noise.
+- **Overnight activity accounting** (Product Intelligence Directive) —
+  the summary reports real Software Brain work: jobs discovered and
+  duplicates removed system-wide (`job_ingestion_runs`, readable live by
+  authenticated users so Home never depends on the cron having already
+  run), opportunities shortlisted for this specific user, new interviews
+  scheduled since yesterday, stale applications, and unread recruiter
+  replies. Every number is conditional on real evidence — a metric that's
+  zero is simply omitted, never padded or explained away.
 - **Honesty by construction** — the generator never fabricates a
-  highlight: an empty state ("Everything is quiet right now") is used
+  highlight: an empty state ("Nothing urgent today — no new opportunities
+  matched your profile overnight, and everything else is quiet") is used
   whenever there's genuinely nothing to report, never a manufactured
   sense of urgency. This mirrors the Product Philosophy's "recommendations
   should be earned... never manipulated."
@@ -91,12 +100,22 @@ user has to fill by acting first:
   milestone type already exists in the schema, ready for a real signal
   source if one is ever integrated.
 
+### Hiring Momentum
+
+- **`packages/lib/src/hiring-momentum.ts`** — compares the current
+  30-day window against the prior 30 days (interview rate, recruiter
+  response rate, application volume) using only the user's own
+  application history. Below a minimum sample size, or when a delta is
+  small enough to be noise (< 5 percentage points), it says so explicitly
+  rather than reporting a trend — shown on `/analytics` as "Hiring
+  momentum."
+
 ### Mission Control (Home)
 
 Home answers "what should I work on today?" instead of showing
 disconnected widgets, per the directive:
 
-- **Today's priorities** (`packages/lib/src/mission-control.ts`,
+- **Today's Mission** (`packages/lib/src/mission-control.ts`,
   `buildDailyPriorities`) — a goal-driven, ordered list: build a resume if
   missing, prepare for interviews within 48 hours, review unread recruiter
   replies, follow up on applications stalled 14+ days, then apply to
@@ -108,7 +127,9 @@ disconnected widgets, per the directive:
   guidance), already excluding jobs the user applied to or dismissed. The
   first 5 show by default with a "show more" expansion so Home stays calm
   on first load, per the Experience Canon's "never overwhelmed"; every
-  card carries its match score, top reason, and a one-click dismiss.
+  card carries its match score, top reason, a **Priority #1/#2/#3** label
+  on the top three (priority-ordered, not just sorted by score), and a
+  one-click dismiss.
 
 ## Delivered
 
@@ -222,8 +243,8 @@ demo-able end to end.
   plus three scheduled background jobs: interview reminders (hourly),
   and the daily briefing job's new-opportunity / follow-up / resume-
   performance / daily-summary notifications (once daily).
-- **Analytics** (`/analytics`) — pipeline counts, response rate, accessible
-  bar charts.
+- **Analytics** (`/analytics`) — pipeline counts, response rate, hiring
+  momentum trend (see above), accessible bar charts.
 - **Company Workspace** (`/companies`) — derived view grouping
   applications, interviews, and cover letters by company.
 - **Integrations** (`/settings/integrations`) — Gmail/Calendar/Drive/
@@ -232,20 +253,21 @@ demo-able end to end.
 
 ### Tests
 
-- **154 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
-  (Vitest) covering validation, journey logic, analytics, ICS generation,
-  AI prompt/response parsing, job discovery (sources, normalize, dedupe,
-  ingest orchestration), confidence scoring, behavioral learning, mission
-  control priorities, the daily briefing generator (summary + notification
-  planning), resume performance, skill-gap analysis, email categorization,
-  cron auth, and UI primitives/components.
-- **25 Playwright e2e tests** (`apps/web/e2e`) against a production build
+- **164 unit tests** across `packages/lib`, `packages/ui`, and `apps/web`
+  (Vitest) covering validation, journey logic, analytics, hiring momentum,
+  ICS generation, AI prompt/response parsing, job discovery (sources,
+  normalize, dedupe, ingest orchestration including duplicate-count
+  tracking), confidence scoring, behavioral learning, mission control
+  priorities, the daily briefing generator (overnight activity + summary
+  + notification planning), resume performance, skill-gap analysis, email
+  categorization, cron auth, and UI primitives/components.
+- **27 Playwright e2e tests** (`apps/web/e2e`) against a production build
   in demo mode — the full golden path plus every feature screen: resumes
   (with performance stats), interviews, coach, journey, learning,
-  documents, inbox, notifications, analytics, integrations, company
-  workspace, the proactive morning greeting, Mission Control priorities,
-  confidence-scored recommendations + dismissal, job match analysis +
-  skill-gap, and profile navigation.
+  documents, inbox, notifications, analytics (with hiring momentum), 
+  integrations, company workspace, the proactive morning greeting,
+  Today's Mission, priority-labeled + confidence-scored recommendations
+  + dismissal, job match analysis + skill-gap, and profile navigation.
 - GitHub Actions CI runs lint, typecheck, unit tests, build, and e2e on
   every push/PR.
 

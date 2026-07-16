@@ -17,6 +17,7 @@ export const maxDuration = 120;
 
 const NEW_JOB_WINDOW_MS = 1000 * 60 * 60 * 24;
 const INTERVIEW_PREP_WINDOW_MS = 1000 * 60 * 60 * 48;
+const DAILY_RECOMMENDATION_LIMIT = 15;
 const HIGH_CONFIDENCE_THRESHOLD = 70;
 const RESUME_PERFORMANCE_MIN_APPLICATIONS = 3;
 const RESUME_PERFORMANCE_MIN_RATE = 50;
@@ -47,15 +48,23 @@ export async function GET(request: Request) {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const newJobCutoff = new Date(now.getTime() - NEW_JOB_WINDOW_MS).toISOString();
 
-  const [{ data: profileRows, error: profilesError }, { data: activeJobRows }] = await Promise.all([
-    supabase.from("profiles").select("*"),
-    supabase.from("jobs").select("*").eq("is_active", true).limit(1000),
-  ]);
+  const [{ data: profileRows, error: profilesError }, { data: activeJobRows }, { data: ingestionRuns }] =
+    await Promise.all([
+      supabase.from("profiles").select("*"),
+      supabase.from("jobs").select("*").eq("is_active", true).limit(1000),
+      supabase
+        .from("job_ingestion_runs")
+        .select("jobs_created, jobs_duplicates_removed")
+        .eq("status", "succeeded")
+        .gte("started_at", newJobCutoff),
+    ]);
 
   if (profilesError) return NextResponse.json({ error: profilesError.message }, { status: 500 });
 
   const activeJobs = (activeJobRows ?? []).map(mapJob);
   const newJobIds = new Set((activeJobRows ?? []).filter((row) => row.created_at >= newJobCutoff).map((row) => row.id));
+  const jobsDiscoveredGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_created, 0);
+  const duplicatesRemovedGlobally = (ingestionRuns ?? []).reduce((sum, run) => sum + run.jobs_duplicates_removed, 0);
 
   let briefingsCreated = 0;
   let notificationsCreated = 0;
@@ -81,7 +90,7 @@ export async function GET(request: Request) {
       supabase.from("applications").select("*, jobs(*)").eq("user_id", profile.id),
       supabase.from("dismissed_jobs").select("jobs(*)").eq("user_id", profile.id),
       supabase.from("resumes").select("*").eq("user_id", profile.id),
-      supabase.from("interviews").select("id, status, scheduled_at").eq("user_id", profile.id).eq("status", "scheduled"),
+      supabase.from("interviews").select("id, status, scheduled_at, created_at").eq("user_id", profile.id).eq("status", "scheduled"),
       supabase.from("recruiter_emails").select("id", { count: "exact", head: true }).eq("user_id", profile.id).is("read_at", null),
     ]);
 
@@ -113,7 +122,7 @@ export async function GET(request: Request) {
       ? { title: topEntry.job.title, company: topEntry.job.company, score: topEntry.match.score }
       : null;
 
-    const newJobsCount = ranked.filter((entry) => newJobIds.has(entry.job.id)).length;
+    const jobsShortlistedCount = Math.min(ranked.length, DAILY_RECOMMENDATION_LIMIT);
     const highConfidenceNewJobs = ranked.filter(
       (entry) => newJobIds.has(entry.job.id) && entry.match.score >= HIGH_CONFIDENCE_THRESHOLD,
     );
@@ -141,6 +150,10 @@ export async function GET(request: Request) {
       const diff = new Date(interview.scheduled_at).getTime() - now.getTime();
       return diff >= 0 && diff <= INTERVIEW_PREP_WINDOW_MS;
     }).length;
+
+    const newInterviewsScheduledCount = (interviewRows ?? []).filter(
+      (interview) => now.getTime() - new Date(interview.created_at).getTime() <= NEW_JOB_WINDOW_MS,
+    ).length;
 
     let staleApplicationCount = getStaleApplications(applications, now).length;
     if (staleApplicationCount > 0) {
@@ -189,9 +202,12 @@ export async function GET(request: Request) {
 
     const planned = planDailyBriefingNotifications({
       greetingName: profile.fullName?.split(" ")[0] ?? "there",
-      newJobsCount,
+      jobsDiscoveredGlobally,
+      duplicatesRemovedGlobally,
+      jobsShortlistedCount,
       topOpportunity,
       upcomingInterviewCount,
+      newInterviewsScheduledCount,
       staleApplicationCount,
       unreadRecruiterEmailCount: unreadRecruiterEmailCount ?? 0,
       newHighConfidenceJobs,

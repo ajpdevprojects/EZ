@@ -1,13 +1,14 @@
 import type { NotificationType } from "@ez/types";
 
 /**
- * Proactive Software Brain (Product Experience Directive): the platform
- * should feel like it already worked before the user opens it. This
- * module is the single source of truth for that "Good morning, I've
- * already..." summary — reused by the live Home greeting (computed on
- * every request, so it's always accurate even without a deployed cron)
- * and by the daily background job that persists the same story as a
- * notification. Entirely deterministic — no AI involved.
+ * Proactive Software Brain (Product Intelligence Directive: Daily
+ * Mission & Proactive Operating System). This module is the single
+ * source of truth for "what I already did overnight and what deserves
+ * attention today" — reused by the live Home greeting (computed on every
+ * request, so it's always accurate even without a deployed cron) and by
+ * the daily background job that persists the same story as a
+ * notification. Entirely deterministic — no AI involved. Every line is
+ * conditional on real evidence; nothing is ever fabricated.
  */
 
 export interface TopOpportunitySummary {
@@ -18,9 +19,12 @@ export interface TopOpportunitySummary {
 
 export interface DailyBriefingSummaryInput {
   greetingName: string;
-  newJobsCount: number;
+  jobsDiscoveredGlobally: number;
+  duplicatesRemovedGlobally: number;
+  jobsShortlistedCount: number;
   topOpportunity: TopOpportunitySummary | null;
   upcomingInterviewCount: number;
+  newInterviewsScheduledCount: number;
   staleApplicationCount: number;
   unreadRecruiterEmailCount: number;
 }
@@ -34,15 +38,29 @@ export interface DailyBriefingSummary {
 export function buildDailyBriefingSummary(input: DailyBriefingSummaryInput): DailyBriefingSummary {
   const highlights: string[] = [];
 
-  if (input.newJobsCount > 0) {
+  if (input.jobsDiscoveredGlobally > 0) {
+    let sentence = `Overnight, I searched job sources and found ${input.jobsDiscoveredGlobally} new ${input.jobsDiscoveredGlobally === 1 ? "listing" : "listings"}`;
+    if (input.duplicatesRemovedGlobally > 0) {
+      sentence += `, removing ${input.duplicatesRemovedGlobally} ${input.duplicatesRemovedGlobally === 1 ? "duplicate" : "duplicates"}`;
+    }
+    highlights.push(`${sentence}.`);
+  }
+
+  if (input.jobsShortlistedCount > 0) {
     highlights.push(
-      `I found ${input.newJobsCount} new ${input.newJobsCount === 1 ? "opportunity" : "opportunities"} since yesterday.`,
+      `I shortlisted ${input.jobsShortlistedCount} ${input.jobsShortlistedCount === 1 ? "opportunity" : "opportunities"} for you today.`,
     );
   }
 
   if (input.topOpportunity) {
     highlights.push(
       `Your top match today is ${input.topOpportunity.title} at ${input.topOpportunity.company} (${input.topOpportunity.score}% confidence).`,
+    );
+  }
+
+  if (input.newInterviewsScheduledCount > 0) {
+    highlights.push(
+      `${input.newInterviewsScheduledCount} new ${input.newInterviewsScheduledCount === 1 ? "interview was" : "interviews were"} scheduled since yesterday.`,
     );
   }
 
@@ -65,7 +83,7 @@ export function buildDailyBriefingSummary(input: DailyBriefingSummaryInput): Dai
   }
 
   if (highlights.length === 0) {
-    highlights.push("Everything is quiet right now — check back soon for new opportunities.");
+    highlights.push("Nothing urgent today — no new opportunities matched your profile overnight, and everything else is quiet.");
   }
 
   return {

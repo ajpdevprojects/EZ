@@ -138,14 +138,26 @@ describe("ingestJobsFromAllSources", () => {
     expect(summary.jobsUpdated).toBe(1);
   });
 
-  it("dedupes before upserting", async () => {
+  it("dedupes before upserting and reports how many duplicates were removed", async () => {
     const { client, upsertedRows } = createFakeSupabase();
     const source = makeSource(async () => [makeNormalizedJob({ sourceId: "1" }), makeNormalizedJob({ sourceId: "1" })]);
 
     const [summary] = await ingestJobsFromAllSources(client, [source]);
 
     expect(summary.jobsFound).toBe(1);
+    expect(summary.jobsDuplicatesRemoved).toBe(1);
     expect(upsertedRows).toHaveLength(1);
+  });
+
+  it("reports zero duplicates removed when every job is unique", async () => {
+    const { client } = createFakeSupabase();
+    const source = makeSource(async () => [
+      makeNormalizedJob({ sourceId: "1", title: "Frontend Engineer" }),
+      makeNormalizedJob({ sourceId: "2", title: "Backend Engineer" }),
+    ]);
+
+    const [summary] = await ingestJobsFromAllSources(client, [source]);
+    expect(summary.jobsDuplicatesRemoved).toBe(0);
   });
 
   it("records a failed run and returns the error when the source throws", async () => {

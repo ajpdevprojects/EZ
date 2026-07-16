@@ -20,9 +20,17 @@ export function OpportunityList({
 
   return (
     <div className="flex flex-col gap-3">
-      {visibleJobs.map((job) => {
+      {visibleJobs.map((job, index) => {
         const match = matches[job.id];
-        return <DismissibleJobCard key={job.id} job={job} matchScore={match?.score} matchReason={match?.reasons[0]} />;
+        return (
+          <DismissibleJobCard
+            key={job.id}
+            job={job}
+            matchScore={match?.score}
+            matchReason={match?.reasons[0]}
+            priorityRank={index < 3 ? index + 1 : undefined}
+          />
+        );
       })}
       {remaining > 0 && (
         <Button type="button" variant="secondary" onClick={() => setShowAll(true)}>

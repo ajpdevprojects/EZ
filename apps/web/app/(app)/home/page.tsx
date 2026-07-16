@@ -33,9 +33,12 @@ export default async function HomePage() {
 
       <MorningGreeting
         greetingName={briefing.greetingName.split(" ")[0]}
-        newOpportunitiesCount={briefing.newOpportunitiesCount}
+        jobsDiscoveredGlobally={briefing.jobsDiscoveredGlobally}
+        duplicatesRemovedGlobally={briefing.duplicatesRemovedGlobally}
+        jobsShortlistedCount={briefing.recommendedJobs.length}
         topOpportunity={topOpportunity}
         upcomingInterviewCount={briefing.upcomingInterviews.length}
+        newInterviewsScheduledCount={briefing.newInterviewsScheduledCount}
         staleApplicationCount={briefing.staleApplicationCount}
         unreadRecruiterEmailCount={briefing.unreadRecruiterEmailCount}
       />
@@ -46,7 +49,7 @@ export default async function HomePage() {
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-display text-lg font-semibold text-foreground">Today&apos;s priorities</h2>
+        <h2 className="font-display text-lg font-semibold text-foreground">Today&apos;s Mission</h2>
         <DailyPriorities priorities={briefing.dailyPriorities} />
       </section>
 

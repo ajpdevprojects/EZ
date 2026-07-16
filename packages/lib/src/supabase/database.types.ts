@@ -277,6 +277,7 @@ export interface Database {
           jobs_created: number;
           jobs_updated: number;
           jobs_archived: number;
+          jobs_duplicates_removed: number;
           error: string | null;
           started_at: string;
           completed_at: string | null;

@@ -37,4 +37,12 @@ describe("JobCard", () => {
     fireEvent.click(screen.getByLabelText(`Not interested in ${job.title} at ${job.company}`));
     expect(onDismiss).toHaveBeenCalledWith(job.id);
   });
+
+  it("shows a priority badge only when priorityRank is provided", () => {
+    const { rerender } = render(<JobCard job={job} />);
+    expect(screen.queryByText(/Priority #/)).not.toBeInTheDocument();
+
+    rerender(<JobCard job={job} priorityRank={1} />);
+    expect(screen.getByText("Priority #1")).toBeInTheDocument();
+  });
 });

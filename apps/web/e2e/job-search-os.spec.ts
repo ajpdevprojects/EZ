@@ -13,9 +13,19 @@ test.describe("Job Search Operating System features (demo mode)", () => {
     await expect(page.getByText(/Your top match today is/)).toBeVisible();
   });
 
-  test("home surfaces today's priorities", async ({ page }) => {
+  test("home surfaces today's mission", async ({ page }) => {
     await page.goto("/home");
-    await expect(page.getByText("Today's priorities")).toBeVisible();
+    await expect(page.getByText("Today's Mission")).toBeVisible();
+  });
+
+  test("today's opportunities are labeled by priority", async ({ page }) => {
+    await page.goto("/home");
+    await expect(page.getByText("Priority #1")).toBeVisible();
+  });
+
+  test("analytics shows an honest hiring momentum summary", async ({ page }) => {
+    await page.goto("/analytics");
+    await expect(page.getByRole("heading", { name: "Hiring momentum" })).toBeVisible();
   });
 
   test("dismissing a recommendation in demo mode explains it's read-only", async ({ page }) => {
