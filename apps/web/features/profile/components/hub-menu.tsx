@@ -10,6 +10,7 @@ import {
   Compass,
   FileStack,
   FileText,
+  Inbox,
   Plug,
 } from "lucide-react";
 import Link from "next/link";
@@ -17,6 +18,7 @@ import Link from "next/link";
 const HUB_ITEMS = [
   { href: "/resume", label: "Resumes", description: "Build and manage your resumes", icon: FileText },
   { href: "/documents", label: "Documents Center", description: "Cover letters and uploaded files", icon: FileStack },
+  { href: "/inbox", label: "Inbox", description: "Recruiter emails, organized and linked", icon: Inbox },
   { href: "/interviews", label: "Interview Center", description: "Schedule and prep for interviews", icon: CalendarClock },
   { href: "/companies", label: "Company Workspace", description: "Everything organized by company", icon: Building2 },
   { href: "/coach", label: "Career Coach", description: "Goals, guidance, and next steps", icon: Compass },

@@ -9,9 +9,11 @@ export interface JobCardProps {
   job: Job;
   saved?: boolean;
   onToggleSave?: (jobId: string) => void;
+  matchScore?: number;
+  matchReason?: string;
 }
 
-export function JobCard({ job, saved = false, onToggleSave }: JobCardProps) {
+export function JobCard({ job, saved = false, onToggleSave, matchScore, matchReason }: JobCardProps) {
   const salary = formatSalaryRange(job.salaryMin, job.salaryMax);
 
   return (
@@ -44,7 +46,9 @@ export function JobCard({ job, saved = false, onToggleSave }: JobCardProps) {
         <div className="flex flex-wrap gap-2">
           <Badge variant="neutral">{EMPLOYMENT_TYPE_LABEL[job.employmentType]}</Badge>
           {job.seniorityLevel && <Badge variant="neutral">{SENIORITY_LABEL[job.seniorityLevel]}</Badge>}
+          {typeof matchScore === "number" && <Badge variant="recommended">{matchScore}% match</Badge>}
         </div>
+        {matchReason && <p className="text-xs text-muted-foreground">{matchReason}</p>}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{salary ?? "Salary not disclosed"}</span>
           <span>{formatRelativeTime(job.postedAt)}</span>

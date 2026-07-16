@@ -28,6 +28,8 @@ export interface Profile {
 export type EmploymentType = "full_time" | "part_time" | "contract" | "internship";
 export type SeniorityLevel = "entry" | "mid" | "senior" | "lead" | "executive";
 
+export type JobSource = "internal" | "remoteok" | "remotive";
+
 export interface Job {
   id: string;
   title: string;
@@ -43,6 +45,8 @@ export interface Job {
   applyUrl: string | null;
   postedAt: string;
   createdAt: string;
+  source: JobSource;
+  isActive: boolean;
 }
 
 export type ApplicationStatus =
@@ -130,11 +134,17 @@ export interface AiMessage {
   createdAt: string;
 }
 
+export interface JobMatchSummary {
+  score: number;
+  reasons: string[];
+}
+
 export interface DailyBriefing {
   greetingName: string;
   applicationsInProgress: number;
   interviewsUpcoming: number;
   recommendedJobs: Job[];
+  recommendedMatches: Record<string, JobMatchSummary>;
   nextAction: string | null;
 }
 
@@ -285,4 +295,29 @@ export interface UserIntegration {
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Recruiter Inbox (Gmail substitute)
+// ---------------------------------------------------------------------
+
+export type RecruiterEmailSource = "manual" | "gmail";
+export type RecruiterEmailCategory = "recruiter_outreach" | "interview" | "rejection" | "offer" | "other";
+
+export interface RecruiterEmail {
+  id: string;
+  userId: string;
+  applicationId: string | null;
+  source: RecruiterEmailSource;
+  gmailMessageId: string | null;
+  fromName: string | null;
+  fromEmail: string;
+  subject: string;
+  body: string;
+  category: RecruiterEmailCategory;
+  receivedAt: string;
+  readAt: string | null;
+  draftReply: string | null;
+  createdAt: string;
+  application?: Application;
 }

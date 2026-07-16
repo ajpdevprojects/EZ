@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./supabase/client": "./src/supabase/client.ts",
     "./supabase/server": "./src/supabase/server.ts",
+    "./supabase/service": "./src/supabase/service.ts",
     "./supabase/proxy": "./src/supabase/proxy.ts"
   },
   "scripts": {
@@ -24,6 +25,7 @@
     "@supabase/supabase-js": "^2.110.7",
     "ai": "^7.0.29",
     "clsx": "^2.1.1",
+    "server-only": "^0.0.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"
   },

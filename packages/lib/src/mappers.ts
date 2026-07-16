@@ -10,6 +10,7 @@ import type {
   IntegrationProvider,
   IntegrationStatus,
   Job,
+  JobSource,
   JourneyMilestone,
   JourneyMilestoneType,
   JourneyTheme,
@@ -20,6 +21,9 @@ import type {
   Notification,
   NotificationType,
   Profile,
+  RecruiterEmail,
+  RecruiterEmailCategory,
+  RecruiterEmailSource,
   Resume,
   ResumeContent,
   ResumeTemplate,
@@ -41,6 +45,7 @@ type LearningResourceRow = Database["public"]["Tables"]["learning_resources"]["R
 type LearningProgressRow = Database["public"]["Tables"]["learning_progress"]["Row"];
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type UserIntegrationRow = Database["public"]["Tables"]["user_integrations"]["Row"];
+type RecruiterEmailRow = Database["public"]["Tables"]["recruiter_emails"]["Row"];
 
 export function mapProfile(row: ProfileRow): Profile {
   return {
@@ -76,6 +81,8 @@ export function mapJob(row: JobRow): Job {
     applyUrl: row.apply_url,
     postedAt: row.posted_at,
     createdAt: row.created_at,
+    source: row.source as JobSource,
+    isActive: row.is_active,
   };
 }
 
@@ -199,5 +206,29 @@ export function mapUserIntegration(row: UserIntegrationRow): UserIntegration {
     metadata: row.metadata,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapRecruiterEmail(
+  row: RecruiterEmailRow,
+  application?: ApplicationRow,
+  job?: JobRow,
+): RecruiterEmail {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    applicationId: row.application_id,
+    source: row.source as RecruiterEmailSource,
+    gmailMessageId: row.gmail_message_id,
+    fromName: row.from_name,
+    fromEmail: row.from_email,
+    subject: row.subject,
+    body: row.body,
+    category: row.category as RecruiterEmailCategory,
+    receivedAt: row.received_at,
+    readAt: row.read_at,
+    draftReply: row.draft_reply,
+    createdAt: row.created_at,
+    application: application ? mapApplication(application, job) : undefined,
   };
 }

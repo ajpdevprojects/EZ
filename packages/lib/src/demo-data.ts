@@ -9,10 +9,12 @@ import type {
   LearningResource,
   Notification,
   Profile,
+  RecruiterEmail,
   Resume,
   UserIntegration,
 } from "@ez/types";
 import { createEmptyResumeContent } from "@ez/types";
+import { rankJobsForProfile } from "./job-matching";
 
 /**
  * Demo data used when Supabase has not been configured, so the product
@@ -52,6 +54,8 @@ export const DEMO_JOBS: Job[] = [
     applyUrl: "https://example.com/jobs/product-designer",
     postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     createdAt: new Date().toISOString(),
+    source: "internal",
+    isActive: true,
   },
   {
     id: "job-2",
@@ -69,6 +73,8 @@ export const DEMO_JOBS: Job[] = [
     applyUrl: "https://example.com/jobs/ui-ux-designer",
     postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
     createdAt: new Date().toISOString(),
+    source: "internal",
+    isActive: true,
   },
   {
     id: "job-3",
@@ -85,6 +91,8 @@ export const DEMO_JOBS: Job[] = [
     applyUrl: "https://example.com/jobs/design-system-designer",
     postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
     createdAt: new Date().toISOString(),
+    source: "internal",
+    isActive: true,
   },
   {
     id: "job-4",
@@ -102,6 +110,8 @@ export const DEMO_JOBS: Job[] = [
     applyUrl: "https://example.com/jobs/senior-frontend-engineer",
     postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
     createdAt: new Date().toISOString(),
+    source: "internal",
+    isActive: true,
   },
   {
     id: "job-5",
@@ -119,6 +129,8 @@ export const DEMO_JOBS: Job[] = [
     applyUrl: "https://example.com/jobs/product-manager",
     postedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
     createdAt: new Date().toISOString(),
+    source: "internal",
+    isActive: true,
   },
 ];
 
@@ -552,6 +564,60 @@ export const DEMO_INTEGRATIONS: UserIntegration[] = [
   },
 ];
 
+export const DEMO_RECRUITER_EMAILS: RecruiterEmail[] = [
+  {
+    id: "email-1",
+    userId: DEMO_PROFILE.id,
+    applicationId: "app-2",
+    source: "manual",
+    gmailMessageId: null,
+    fromName: "Priya Nair",
+    fromEmail: "priya.nair@vertex.example.com",
+    subject: "Interview confirmation — UI/UX Designer",
+    body: "Hi Alex,\n\nGreat speaking with you! I'd like to confirm your panel interview for the UI/UX Designer role in two days at 10am. You'll meet with our design lead and a product manager.\n\nLet me know if you have any questions.\n\nBest,\nPriya",
+    category: "interview",
+    receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    readAt: null,
+    draftReply: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    application: DEMO_APPLICATIONS[1],
+  },
+  {
+    id: "email-2",
+    userId: DEMO_PROFILE.id,
+    applicationId: "app-1",
+    source: "manual",
+    gmailMessageId: null,
+    fromName: "Jordan Blake",
+    fromEmail: "jordan.blake@acme.example.com",
+    subject: "Thanks for applying to Acme Inc.",
+    body: "Hi Alex,\n\nThank you for applying to the Product Designer role. Our team is reviewing applications and we'll be in touch within the next two weeks with an update.\n\nThanks,\nJordan\nTalent Acquisition, Acme Inc.",
+    category: "recruiter_outreach",
+    receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    readAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    draftReply: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    application: DEMO_APPLICATIONS[0],
+  },
+  {
+    id: "email-3",
+    userId: DEMO_PROFILE.id,
+    applicationId: "app-4",
+    source: "manual",
+    gmailMessageId: null,
+    fromName: "Morgan Reyes",
+    fromEmail: "morgan.reyes@meridian.example.com",
+    subject: "Offer — Product Manager at Meridian",
+    body: "Hi Alex,\n\nWe're thrilled to offer you the Product Manager position at Meridian! Attached you'll find the formal offer letter. Please let us know if you have any questions about compensation or start date.\n\nCongratulations,\nMorgan",
+    category: "offer",
+    readAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    draftReply: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+    application: DEMO_APPLICATIONS[3],
+  },
+];
+
 export function createEmptyDemoResume(title: string): Resume {
   return {
     id: `resume-${crypto.randomUUID()}`,
@@ -573,11 +639,17 @@ export function getDemoDailyBriefing(): DailyBriefing {
     (application) => application.status === "interviewing",
   ).length;
 
+  const resumeSkills = DEMO_RESUMES[0]?.content.skills ?? [];
+  const recommended = rankJobsForProfile(DEMO_JOBS, DEMO_PROFILE, resumeSkills).slice(0, 3);
+
   return {
     greetingName: DEMO_PROFILE.fullName ?? "there",
     applicationsInProgress,
     interviewsUpcoming,
-    recommendedJobs: DEMO_JOBS.slice(0, 3),
+    recommendedJobs: recommended.map((entry) => entry.job),
+    recommendedMatches: Object.fromEntries(
+      recommended.map((entry) => [entry.job.id, { score: entry.match.score, reasons: entry.match.reasons }]),
+    ),
     nextAction: "Review your UI/UX Designer interview prep for Vertex.",
   };
 }

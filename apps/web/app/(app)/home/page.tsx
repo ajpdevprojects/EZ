@@ -41,9 +41,17 @@ export default async function HomePage() {
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-lg font-semibold text-foreground">Recommended for you</h2>
         <div className="flex flex-col gap-3">
-          {briefing.recommendedJobs.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
+          {briefing.recommendedJobs.map((job) => {
+            const match = briefing.recommendedMatches[job.id];
+            return (
+              <JobCard
+                key={job.id}
+                job={job}
+                matchScore={match?.score}
+                matchReason={match?.reasons[0]}
+              />
+            );
+          })}
         </div>
       </section>
     </main>

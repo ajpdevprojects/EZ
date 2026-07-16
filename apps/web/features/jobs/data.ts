@@ -8,7 +8,12 @@ export async function getAllJobs(): Promise<Job[]> {
   const supabase = await createClient();
   if (!supabase) return DEMO_JOBS;
 
-  const { data } = await supabase.from("jobs").select("*").order("posted_at", { ascending: false });
+  const { data } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("is_active", true)
+    .order("posted_at", { ascending: false })
+    .limit(500);
   return (data ?? []).map(mapJob);
 }
 

@@ -41,6 +41,11 @@ export interface Database {
           apply_url: string | null;
           posted_at: string;
           created_at: string;
+          source: string;
+          source_id: string | null;
+          is_active: boolean;
+          expires_at: string | null;
+          last_seen_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["jobs"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["jobs"]["Row"]>;
@@ -239,6 +244,57 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["user_integrations"]["Row"]>;
         Relationships: [];
+      };
+      job_ingestion_runs: {
+        Row: {
+          id: string;
+          source: string;
+          status: string;
+          jobs_found: number;
+          jobs_created: number;
+          jobs_updated: number;
+          jobs_archived: number;
+          error: string | null;
+          started_at: string;
+          completed_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["job_ingestion_runs"]["Row"]> & { source: string };
+        Update: Partial<Database["public"]["Tables"]["job_ingestion_runs"]["Row"]>;
+        Relationships: [];
+      };
+      recruiter_emails: {
+        Row: {
+          id: string;
+          user_id: string;
+          application_id: string | null;
+          source: string;
+          gmail_message_id: string | null;
+          from_name: string | null;
+          from_email: string;
+          subject: string;
+          body: string;
+          category: string;
+          received_at: string;
+          read_at: string | null;
+          draft_reply: string | null;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["recruiter_emails"]["Row"]> & {
+          user_id: string;
+          from_email: string;
+          subject: string;
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["recruiter_emails"]["Row"]>;
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_emails_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;
