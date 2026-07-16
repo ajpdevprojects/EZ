@@ -46,6 +46,20 @@ export async function createTailoredCoverLetterAction(
   const context = await requireUser();
   if ("error" in context) return { error: context.error };
 
+  // applicationId is caller-supplied — confirm it's actually this user's
+  // application before linking, rather than trusting the client. RLS would
+  // stop them reading someone else's application through the link, but
+  // without this check they could still plant a reference to an arbitrary
+  // application id on their own cover letter.
+  const { data: application } = await context.supabase
+    .from("applications")
+    .select("id")
+    .eq("id", applicationId)
+    .eq("user_id", context.user.id)
+    .maybeSingle();
+
+  if (!application) return { error: "That application couldn't be found." };
+
   const { data, error } = await context.supabase
     .from("cover_letters")
     .insert({

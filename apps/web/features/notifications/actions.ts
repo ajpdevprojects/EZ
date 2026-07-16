@@ -9,10 +9,16 @@ export async function markNotificationReadAction(notificationId: string): Promis
     return { error: "Notifications aren't available yet — Supabase hasn't been configured." };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired — please sign in again." };
+
   const { error } = await supabase
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId);
+    .eq("id", notificationId)
+    .eq("user_id", user.id);
 
   if (error) return { error: error.message };
 

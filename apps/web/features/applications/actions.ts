@@ -98,8 +98,15 @@ export async function updateApplicationStatusAction(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Your session expired — please sign in again." };
 
-  const { error } = await supabase.from("applications").update({ status }).eq("id", applicationId);
+  const { data: updated, error } = await supabase
+    .from("applications")
+    .update({ status })
+    .eq("id", applicationId)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!updated) return { error: "That application couldn't be found." };
 
   await recordApplicationStatusMilestones(supabase, applicationId, status);
 
@@ -107,6 +114,7 @@ export async function updateApplicationStatusAction(
     .from("applications")
     .select("job_id, jobs(title, company)")
     .eq("id", applicationId)
+    .eq("user_id", user.id)
     .maybeSingle();
   const job = (application as { jobs?: { title: string; company: string } | null } | null)?.jobs;
 

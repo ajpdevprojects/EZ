@@ -80,10 +80,16 @@ export async function markInterviewCompletedAction(interviewId: string): Promise
     return { error: "Updating interviews isn't available yet — Supabase hasn't been configured." };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired — please sign in again." };
+
   const { data: interview, error } = await supabase
     .from("interviews")
     .update({ status: "completed" })
     .eq("id", interviewId)
+    .eq("user_id", user.id)
     .select("application_id")
     .single();
 
@@ -102,7 +108,16 @@ export async function cancelInterviewAction(interviewId: string): Promise<{ erro
     return { error: "Updating interviews isn't available yet — Supabase hasn't been configured." };
   }
 
-  const { error } = await supabase.from("interviews").update({ status: "cancelled" }).eq("id", interviewId);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Your session expired — please sign in again." };
+
+  const { error } = await supabase
+    .from("interviews")
+    .update({ status: "cancelled" })
+    .eq("id", interviewId)
+    .eq("user_id", user.id);
   if (error) return { error: error.message };
 
   revalidatePath("/interviews");

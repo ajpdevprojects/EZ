@@ -1,4 +1,19 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const bufferA = Buffer.from(a);
+  const bufferB = Buffer.from(b);
+  // timingSafeEqual throws on length mismatch instead of returning false, and
+  // comparing lengths first would itself leak timing info about the secret's
+  // length — so pad to a fixed size before comparing.
+  const length = Math.max(bufferA.length, bufferB.length, 32);
+  const paddedA = Buffer.alloc(length);
+  const paddedB = Buffer.alloc(length);
+  bufferA.copy(paddedA);
+  bufferB.copy(paddedB);
+  return bufferA.length === bufferB.length && timingSafeEqual(paddedA, paddedB);
+}
 
 /**
  * Guards a background job route so it can only be triggered by the
@@ -18,8 +33,8 @@ export function verifyCronRequest(request: Request): NextResponse | null {
     );
   }
 
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
+  const authHeader = request.headers.get("authorization") ?? "";
+  if (!timingSafeEqualStrings(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

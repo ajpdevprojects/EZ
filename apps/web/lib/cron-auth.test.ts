@@ -35,4 +35,30 @@ describe("verifyCronRequest", () => {
     );
     expect(response).toBeNull();
   });
+
+  it("rejects a shorter guess that is a prefix of the real secret", async () => {
+    process.env.CRON_SECRET = "correct-secret";
+    const response = verifyCronRequest(
+      new Request("https://example.com/api/cron/ingest-jobs", {
+        headers: { authorization: "Bearer correct" },
+      }),
+    );
+    expect(response?.status).toBe(401);
+  });
+
+  it("rejects a longer guess that starts with the real secret", async () => {
+    process.env.CRON_SECRET = "correct-secret";
+    const response = verifyCronRequest(
+      new Request("https://example.com/api/cron/ingest-jobs", {
+        headers: { authorization: "Bearer correct-secret-extra" },
+      }),
+    );
+    expect(response?.status).toBe(401);
+  });
+
+  it("rejects when the authorization header is missing entirely", async () => {
+    process.env.CRON_SECRET = "correct-secret";
+    const response = verifyCronRequest(new Request("https://example.com/api/cron/ingest-jobs"));
+    expect(response?.status).toBe(401);
+  });
 });
