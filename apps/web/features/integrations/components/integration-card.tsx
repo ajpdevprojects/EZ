@@ -64,11 +64,12 @@ export function IntegrationCard({ integration }: { integration: UserIntegration 
           <Icon className="size-5" aria-hidden="true" />
         </span>
         <div className="flex flex-1 flex-col gap-0.5">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-medium text-foreground">{info.label}</p>
             <Badge variant={integration.status === "connected" ? "success" : "neutral"}>
               {integration.status === "connected" ? "Connected" : "Not connected"}
             </Badge>
+            {info.comingSoon && <Badge variant="warning">Sync coming soon</Badge>}
           </div>
           <p className="text-xs text-muted-foreground">{info.description}</p>
         </div>

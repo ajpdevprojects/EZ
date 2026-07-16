@@ -63,6 +63,12 @@ test.describe("Platform Completion Mode features (demo mode)", () => {
     await expect(page.getByText("LinkedIn", { exact: true })).toBeVisible();
   });
 
+  test("integrations page is honest that no provider actually syncs yet", async ({ page }) => {
+    await page.goto("/settings/integrations");
+    await expect(page.getByText("Sync coming soon").first()).toBeVisible();
+    expect(await page.getByText("Sync coming soon").count()).toBe(4);
+  });
+
   test("company workspace groups applications by company", async ({ page }) => {
     await page.goto("/companies");
     await expect(page.getByRole("heading", { name: "Company Workspace" })).toBeVisible();
