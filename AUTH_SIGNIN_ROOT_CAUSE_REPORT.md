@@ -479,3 +479,201 @@ Does not and cannot establish from this sandbox:
    any future drift, since the trigger is now the primary path), the
    `insertError` fields logged will name the exact Postgres error to act
    on next — no further guessing required.
+
+---
+
+## Addendum — 2026-07-17 (second): the database was ruled out, so was the bug elsewhere in the redirect chain?
+
+New production evidence, gathered after the migration above and the
+first addendum's instrumentation were live:
+
+- The browser holds a valid `sb-...-auth-token` cookie.
+- `signInWithPassword()` succeeds and returns a session.
+- The browser navigates to `/home`.
+- `/home` immediately redirects back to `/sign-in`.
+- `auth.users` and `profiles` have matching rows.
+- `handle_new_user()` and `on_auth_user_created` exist.
+
+This rules out everything the first addendum was uncertain about: the
+database side is confirmed correct, so the self-heal path and the
+trigger are no longer suspects. The symptom is now narrowed to exactly
+one claim — **the server does not see the same session the browser has**
+— and the instruction was to investigate `proxy.ts`
+(`packages/lib/src/supabase/proxy.ts`, Next 16's rename of
+`middleware.ts`), `packages/lib/src/supabase/server.ts`,
+`apps/web/lib/session.ts`, every `createServerClient()` call site, and
+every redirect guarding `/home`, and to instrument the cookies the server
+actually receives.
+
+### Code review of every requested file
+
+- **`packages/lib/src/supabase/proxy.ts`** (the middleware) — follows
+  Supabase's documented Next.js SSR pattern exactly: `response` is
+  re-created inside `setAll` from the *mutated* `request`, so a
+  same-request cookie refresh is visible to the Server Component render
+  that follows. The matcher
+  (`apps/web/proxy.ts`) excludes only static assets, not `/home`.
+- **`packages/lib/src/supabase/server.ts`** — also the documented
+  pattern: `cookies()` is read once per call and wired straight through
+  to `createServerClient`. No custom `cookieOptions` (name/domain/path)
+  anywhere in the codebase — confirmed by grep — so there is no
+  browser/server cookie-name mismatch to find.
+- **`apps/web/lib/session.ts`** — see "the one real defect found" below.
+- **Every `createServerClient()` call site** — exactly two in the whole
+  repository (`proxy.ts`, `server.ts`), both grepped and read in full.
+  No third, divergent client construction exists anywhere. The browser
+  client (`packages/lib/src/supabase/client.ts`, `createBrowserClient`)
+  uses the same `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  and no custom cookie options either, so it encodes/names cookies
+  identically to what the server expects to read.
+- **Every redirect guarding `/home`** — `(app)/layout.tsx` (`if
+  (!session) redirect("/sign-in")`) and `home/page.tsx`'s own identical,
+  redundant check. Both call `getCurrentSession()`, and — this turn's one
+  real finding — both called it *independently*.
+
+### The one real defect found: two un-memoized `getCurrentSession()` calls per request
+
+Every navigation to `/home` calls `getCurrentSession()` twice: once from
+`(app)/layout.tsx`, once from `home/page.tsx`. Before this turn, each
+call built its own `createServerClient` from scratch and called
+`auth.getUser()` independently — two separate round trips doing
+identical work, with no coordination between them.
+
+Verified locally, against the real `@supabase/ssr`/`@supabase/auth-js`
+code (not a mock of it) driven by a hand-built mock Supabase Auth server,
+exactly how `auth.getUser()` behaves near a token's expiry:
+
+- `getUser()` (with no explicit JWT argument, which is how this codebase
+  always calls it) goes through `_useSession` → `__loadSession`, which
+  checks the stored session's `expires_at` against a **90-second
+  proactive-refresh margin** (`EXPIRY_MARGIN_MS` in `@supabase/auth-js`'s
+  constants) — independent of the `autoRefreshToken` setting, which only
+  controls the background timer, not this on-demand check.
+- Inside that margin, `getUser()` refreshes and **rotates the refresh
+  token** (single-use) before answering.
+- `createServerClient`'s built-in `onAuthStateChange` handler persists
+  that rotation through the `setAll` callback this codebase provides —
+  which, in `server.ts`, is wrapped in a `try { cookieStore.set(...) }
+  catch {}` that **silently discarded any error** before this turn.
+  `cookies().set()` always throws when called from a plain Server
+  Component (as opposed to a Server Action or Route Handler) — Next.js
+  gives Server Components no response to attach `Set-Cookie` headers to.
+  So if a refresh happens while `home/page.tsx` (a Server Component) is
+  rendering, the new tokens are computed but never saved, and the
+  now-consumed old refresh token is gone.
+- Two independent, un-memoized calls hitting this at once — as
+  `(app)/layout.tsx` and `home/page.tsx` did every single request — would
+  race for that one single-use refresh token. Confirmed the SDK is more
+  resilient than the naive version of this theory predicts: a losing
+  refresh attempt whose access token is *still* technically valid falls
+  back to using it directly rather than failing outright (a documented
+  "proactive-preserve" mirror in this version of `@supabase/auth-js`).
+  But that fallback depends on the access token not having actually
+  expired yet — only being inside the 90-second proactive margin. If it's
+  raced at a moment where the access token has already passed its real
+  expiry, the losing call has no fallback left and correctly, from the
+  SDK's perspective, reports no user — which is indistinguishable from
+  "not signed in" by the time it reaches `getCurrentSession()`.
+
+Fixed by wrapping `getCurrentSession()` in React's `cache()`
+(`apps/web/lib/session.ts`), the standard Next.js App Router mechanism
+for per-request memoization of Server Component data fetching. Every
+call within one request now reuses the first result instead of
+re-deriving it, so there is exactly one `auth.getUser()` call per
+request and no second client to race the first.
+
+### What local reproduction could and could not confirm
+
+Built several local scenarios against a real `GoTrueClient` (not a
+hand-mocked one) and a mock Supabase Auth server implementing password
+grant, refresh-token grant with single-use rotation, and `/user`:
+
+1. **Long-lived token, single call** — succeeds, no refresh needed.
+   Sanity check, not informative on its own.
+2. **Token inside the 90s margin, middleware runs first** — the
+   middleware's own `getUser()` call refreshes and correctly propagates
+   the new cookie into the same request via `request.cookies.set()`, so
+   the Server Component's later, independent call sees an
+   already-fresh token and never attempts a second refresh. **No bug
+   under this ordering** — which is the ordering Next.js should always
+   use, since the middleware matcher includes `/home`.
+3. **Simulated middleware not running at all** (bypassing `updateSession`
+   entirely) with a near-margin token — still resolved correctly, via the
+   SDK's still-valid-access-token fallback described above.
+4. **Two concurrent, un-memoized calls sharing a token engineered to
+   already be past real expiry** — did not reproduce a losing call either;
+   the seeding step's own client transparently self-healed the session
+   before the race began, which is itself informative (this SDK version
+   is more defensive against exactly this class of bug than the naive
+   theory assumes) but meant this specific construction couldn't force
+   the failure state to observe it directly.
+
+Reported honestly: **no local construction reproduced "browser has a
+valid cookie, server sees none."** Every scenario the code review
+suggested as plausible either worked correctly or was defended against
+by the SDK's own fallback behavior. This is a genuine negative result,
+not a gap — it means the bug, if it is exactly this refresh-race
+mechanism, requires either real Vercel-infrastructure timing (concurrent
+requests from a browser's parallel data-fetching, not achievable in a
+single-process local repro) or a Supabase project configuration (e.g. a
+non-default JWT expiry) that this sandbox cannot inspect and was
+instructed not to investigate further.
+
+### What the new instrumentation will show on the next real attempt
+
+`packages/lib/src/supabase/proxy.ts` and `packages/lib/src/supabase/
+server.ts` now log, at every checkpoint, the cookie **names and value
+lengths** visible to that checkpoint (never raw values — a logged token
+is a hijackable session; a logged name/length is not), and whether
+`setAll` fires (meaning a refresh/rotation happened) at each of them,
+including the exact error if persisting it throws. On the next real
+sign-in attempt, Vercel's function logs will show, in order:
+
+1. What cookies the middleware saw on the incoming `/home` request —
+   compare the names directly against the browser's DevTools cookie
+   panel for the same request.
+2. Whether the middleware's own `getUser()` triggered a refresh, and
+   what it rotated.
+3. What cookies `(app)/layout.tsx`'s single (now memoized)
+   `getCurrentSession()` call saw.
+4. Whether *that* call also needed to refresh, and if its `setAll`
+   threw — which, per the fix above, no longer discards the error
+   silently.
+
+If the logs show the middleware and the Server Component call disagree
+on cookie names/count for the same request, that points at something
+outside this codebase (a proxy/CDN header-size limit, a Vercel
+Edge/Node runtime environment-variable mismatch between the two
+execution contexts) rather than at this application's cookie-handling
+code, which was read in full and found to follow the documented pattern
+correctly at every call site.
+
+### Files changed this turn
+
+- `packages/lib/src/supabase/proxy.ts` — logs incoming cookie
+  names/lengths, logs `setAll`/refresh firing, logs `auth.getUser()`'s
+  result (user id or error code/status/message)
+- `packages/lib/src/supabase/server.ts` — logs cookies visible to each
+  `createClient()` call, logs `setAll`/refresh firing, and — the one
+  behavior change beyond logging — surfaces the error when persisting a
+  refresh throws instead of silently swallowing it
+- `apps/web/lib/session.ts` — `getCurrentSession()` wrapped in React's
+  `cache()` for per-request memoization, removing the duplicate-call
+  race described above
+
+### What remains outstanding
+
+1. **A real sign-in attempt against the current Vercel deployment**,
+   with the function logs read afterward — this is what will show
+   definitively whether the cookies the middleware and the Server
+   Component see actually match, and whether a refresh is firing where
+   it shouldn't need to. Nothing short of the real deployment can settle
+   this; every local construction this turn either worked or was
+   defended against by the SDK, which is useful signal but not proof.
+2. If the logs show a refresh firing on nearly every request (not just
+   near-expiry), the Supabase project's configured **JWT expiry**
+   setting is worth checking on the dashboard — a value close to or
+   below the 90-second proactive-refresh margin would make every request
+   hit this path, not just an edge case. This is Supabase project
+   configuration, not application code, so it's named here rather than
+   changed.
