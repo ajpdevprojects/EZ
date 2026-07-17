@@ -9,8 +9,22 @@ import { Sparkles } from "lucide-react";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {
+  console.error("[REDIRECT-TRACE] apps/web/app/(app)/home/page.tsx HomePage() entered");
+
   const session = await getCurrentSession();
-  if (!session) redirect("/sign-in");
+
+  console.error("[REDIRECT-TRACE] apps/web/app/(app)/home/page.tsx getCurrentSession() resolved", {
+    sessionIsNull: session === null,
+    isDemo: session === null ? null : session.isDemo,
+    profileId: session === null ? null : session.profile.id,
+  });
+
+  if (!session) {
+    console.error(
+      '[REDIRECT-TRACE] FIRED apps/web/app/(app)/home/page.tsx:26 redirect("/sign-in") — condition `!session` was true because session === null',
+    );
+    redirect("/sign-in");
+  }
 
   const briefing = await getDailyBriefing(session.profile, session.isDemo);
   const topJob = briefing.recommendedJobs[0];

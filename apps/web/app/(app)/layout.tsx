@@ -30,18 +30,38 @@ const NAV_ITEMS: BottomNavItem[] = [
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  console.error("[REDIRECT-TRACE] apps/web/app/(app)/layout.tsx AppLayout() entered");
+
   const session = await getCurrentSession();
 
+  console.error("[REDIRECT-TRACE] apps/web/app/(app)/layout.tsx getCurrentSession() resolved", {
+    sessionIsNull: session === null,
+    isDemo: session === null ? null : session.isDemo,
+    profileId: session === null ? null : session.profile.id,
+    onboardingCompletedAt: session === null ? null : session.profile.onboardingCompletedAt,
+  });
+
   if (!session) {
-    console.error("[AppLayout] getCurrentSession() returned null — redirecting to /sign-in");
+    console.error(
+      "[REDIRECT-TRACE] FIRED apps/web/app/(app)/layout.tsx:48 redirect(\"/sign-in\") — condition `!session` was true because session === null",
+    );
     redirect("/sign-in");
   }
   if (!session.isDemo && !session.profile.onboardingCompletedAt) {
-    console.error("[AppLayout] session found but onboarding incomplete — redirecting to /onboarding", {
-      userId: session.profile.id,
-    });
+    console.error(
+      "[REDIRECT-TRACE] FIRED apps/web/app/(app)/layout.tsx:59 redirect(\"/onboarding\") — condition `!session.isDemo && !session.profile.onboardingCompletedAt` was true",
+      {
+        isDemo: session.isDemo,
+        onboardingCompletedAt: session.profile.onboardingCompletedAt,
+        userId: session.profile.id,
+      },
+    );
     redirect("/onboarding");
   }
+
+  console.error("[REDIRECT-TRACE] apps/web/app/(app)/layout.tsx AppLayout() passed both checks — rendering children", {
+    userId: session.profile.id,
+  });
 
   const unreadCount = await getUnreadNotificationCount(session.profile.id, session.isDemo);
 

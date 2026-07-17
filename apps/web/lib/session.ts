@@ -45,6 +45,15 @@ export interface SessionResult {
  * instead of re-deriving it.
  */
 export const getCurrentSession = cache(async function getCurrentSession(): Promise<SessionResult | null> {
+  // Logging here (vs. only at the call sites) is what proves cache()
+  // is actually deduplicating in the deployed runtime: this line should
+  // appear at most once per request no matter how many of
+  // (app)/layout.tsx and home/page.tsx call getCurrentSession(). If it
+  // appears twice for one navigation, cache() is not memoizing across
+  // those two call sites in production the way it does locally, and that
+  // — not the redirect conditions themselves — is the fact to chase next.
+  console.error("[REDIRECT-TRACE] apps/web/lib/session.ts getCurrentSession() body executing (not served from cache)");
+
   const supabase = await createClient();
 
   if (!supabase) {
