@@ -264,3 +264,218 @@ flagged it.
    only way to close the loop this environment cannot perform — carried
    forward as the same category of outstanding manual verification noted
    in `PRODUCTION_AUTH_REPORT.md` and `AUTHENTICATION_AUDIT.md`.
+
+---
+
+## Addendum — 2026-07-17: re-investigation after production evidence contradicted this report
+
+Live production evidence, reported directly by the project owner after
+commit `c7e4160` (which included the self-heal fix above) had already been
+deployed:
+
+- Auth users exist in `auth.users`.
+- `public.profiles` is **empty**.
+- `public.handle_new_user()` does not exist.
+- `on_auth_user_created` does not exist.
+- `"profiles are insertable by owner"` (the INSERT policy from this
+  report) **does** exist.
+- Sign In still cannot proceed past the login screen.
+
+This directly contradicts this report's framing that the trigger was
+"not the primary mechanism" and that the self-heal insert would cover for
+its absence. It doesn't — the table is empty, meaning the self-heal path
+is either never reached or never succeeding. This addendum documents a
+from-scratch re-investigation that assumed nothing from the original
+report was correct until re-verified, per explicit instruction not to
+assume the prior fix was working.
+
+### Finding 1: the self-heal insert had the exact bug it was written to fix
+
+`getCurrentSession()`'s insert call read:
+
+```ts
+const { data: createdRow } = await supabase
+  .from("profiles").insert({...}).select().single();
+if (!createdRow) return null;
+```
+
+`error` was discarded — identical in shape to the original bug this report
+fixed on the `select()` call, just one insert-call later. If the insert
+failed for *any* reason in production (a missing platform GRANT, a schema
+mismatch, an RLS edge case not covered by local testing, anything), there
+would be no log line, no thrown error, nothing — just a silent `null`,
+indistinguishable from "not signed in." This is a real gap in this
+report's original verification: the reproduction tests
+(`session.test.ts`) used a hand-mocked Supabase client that always made
+the insert succeed, so this path was never exercised against a failure
+case.
+
+Fixed in `apps/web/lib/session.ts`: `auth.getUser()`, the profile
+`select()`, and the self-heal `insert()` now each log their outcome
+(`console.error`, since Vercel captures stderr in function logs) with the
+Supabase error's `code`/`message`/`details`/`hint` on failure. Same
+instrumentation added at both `redirect()` decision points in
+`(app)/layout.tsx`, and at both branches of `signInWithPassword` in
+`signInAction`. These cover exactly the five checkpoints requested:
+`auth.getUser()` result, profile lookup result, whether the insert
+executes, the insert result/error, and why `/home` redirects. The next
+real sign-in attempt in the live deployment will produce a definitive
+answer in Vercel's function logs — something no amount of local
+inspection can substitute for, since this sandbox has no network path to
+the live Supabase project or Vercel deployment (unchanged from every
+prior report on this branch).
+
+### Finding 2: the original report's "trigger is optional" conclusion was an overreach
+
+The original report verified that the self-heal *insert statement* is
+capable of succeeding, given the RLS policy and the standard
+Supabase-provisioned `GRANT`, against a local PostgreSQL instance. That is
+a real, valid finding — but it is not the same claim as "the self-heal
+path in the deployed application actually runs and succeeds," which was
+never verified end-to-end. Two gaps in that chain, neither exercised by
+the mocked unit tests:
+
+1. Whether `auth.getUser()` recognizes the session cookie on the very
+   first server render immediately after `signInAction`'s redirect, in
+   the real deployed runtime — not assumed here, but not verified either.
+2. Whether the insert itself succeeds in the *actual* production
+   database, which could differ from the local replica in ways this
+   sandbox cannot observe (e.g. a revoked default `GRANT`, a constraint
+   difference) — and, per Finding 1, would have failed *silently* even if
+   it didn't.
+
+Restated plainly: "the SQL can work" is not "the SQL is working." The
+corrected position is that `public.handle_new_user()` is the **primary**
+mechanism — it runs `SECURITY DEFINER` inside the same transaction as the
+`auth.users` insert, bypassing RLS and the client's own session state
+entirely, so it cannot fail for any of the reasons the client-side
+self-heal can. The self-heal in `session.ts` is correctly framed as a
+fallback for drift, not a replacement for the trigger, and the original
+report should not have implied the trigger was dispensable.
+
+### Corrected migration
+
+`supabase/migrations/20260201070000_restore_handle_new_user_trigger.sql`
+(new) does two things, both required by the verified production facts:
+
+1. Restores `handle_new_user()` and `on_auth_user_created`
+   (`create or replace` / `drop trigger if exists` + `create trigger`, so
+   it's safe to run regardless of the target database's exact partial
+   state) — fixes profile creation for **future** signups.
+2. **Backfills every existing `auth.users` row that has no matching
+   `public.profiles` row.** This is the part the trigger alone cannot
+   fix: a trigger fires on new `INSERT`s into `auth.users`, not
+   retroactively, and the verified production facts state the affected
+   accounts already exist. Without this, restoring the trigger would stop
+   the bleeding for new signups but leave every currently-locked-out user
+   exactly as locked out as before.
+
+Empirically verified against a local PostgreSQL 16 instance rebuilt to
+match the exact verified production state (`profiles` table and its
+insert/select/update policies present, `handle_new_user`/trigger absent,
+one `auth.users` row with no matching `profiles` row):
+
+- Applying the migration inserted exactly one row — the orphaned user —
+  and left an already-resolved user's row untouched.
+- A subsequent `insert into auth.users` (simulating a brand-new signup)
+  then correctly produced a matching `profiles` row automatically via the
+  restored trigger, with no application code involved.
+
+### Local end-to-end reproduction attempt: what it did and didn't establish
+
+To go beyond mocked unit tests, a minimal HTTP server
+(`mock-supabase.mjs`, not committed — scratch tooling) was built to stand
+in for Supabase's Auth and REST APIs, so the **real**
+`@supabase/ssr`/`@supabase/supabase-js` code paths in this codebase could
+run against it unmodified, driven through a real browser via Playwright.
+
+This surfaced a failure — `signInWithPassword` rejecting with a
+"Host not in allowlist"-shaped, non-JSON response — when exercised through
+the actual `signInAction` Server Action inside the Next.js dev server.
+Isolated by elimination before concluding anything from it:
+
+- `curl`, plain Node `fetch`, and a standalone Node script using
+  `@supabase/supabase-js`'s plain (non-SSR) client all reached the mock
+  server successfully.
+- A plain Next.js Route Handler doing `fetch()`, and the same Route
+  Handler using the plain `@supabase/supabase-js` client, also succeeded.
+- The same Route Handler switched to the actual
+  `createClient()` from `packages/lib/src/supabase/server.ts` (the real
+  `@supabase/ssr` `createServerClient` wrapper `signInAction` uses,
+  integrated with Next's `cookies()`) **reproduced the failure**.
+- A standalone Node script — no Next.js involved at all — calling that
+  exact same `createServerClient()` construction against the same mock
+  server **succeeded** (`{"hasSession":true}`).
+
+That last result is decisive: the `@supabase/ssr` client construction
+itself is not the cause, since it works correctly outside the Next.js dev
+server. The failure is specific to running inside this sandbox's Next.js
+dev server once a `cookies()`-triggered dynamic request is involved —
+most likely this environment's own request interception reacting to
+Next's dynamic-rendering fetch instrumentation, not application code. No
+string resembling "Host not in allowlist" exists anywhere in this
+repository's dependencies or this sandbox's filesystem, which is
+consistent with it originating from the sandbox's own network layer
+rather than from Supabase or Next.js source.
+
+This is reported for transparency rather than omitted, but it is **not**
+treated as a production-relevant finding: it could not be reproduced
+outside the Next dev server, and this sandbox has no network path to
+verify it either way against the real Vercel runtime. It's a dead end in
+this particular reproduction technique, not a conclusion about the app.
+
+### What this addendum does and does not establish
+
+Does establish, empirically:
+- A real, previously-unnoticed bug in this codebase's own self-heal code
+  (silent error-swallowing on insert failure), now fixed with full
+  instrumentation at every requested checkpoint.
+- A migration that fixes the verified production symptom
+  (`profiles` empty despite existing `auth.users` rows) directly and
+  immediately upon application — the backfill does not depend on any
+  user signing in again, and does not depend on the self-heal path
+  working correctly at all.
+- The restored trigger, verified against a local replica of the exact
+  reported production schema state, both fixes future signups and cannot
+  fail for the same reasons the client-side self-heal can.
+
+Does not and cannot establish from this sandbox:
+- The precise reason `auth.getUser()` / the self-heal insert were not
+  producing a profile row in the *live* production runtime specifically —
+  this sandbox has no network path to the live Supabase project or Vercel
+  deployment, a limitation unchanged from every prior report on this
+  branch. The instrumentation added this turn is what will answer that
+  definitively, from real Vercel function logs, on the next sign-in
+  attempt against the current deployment.
+- Whether the "Host not in allowlist" artifact has any counterpart in the
+  real Vercel/Supabase network path — treated as an unresolved, sandbox-
+  specific dead end rather than asserted either way.
+
+### Files changed this turn
+
+- `apps/web/lib/session.ts` — instrumentation on all three Supabase calls
+- `apps/web/app/(app)/layout.tsx` — instrumentation on both redirects
+- `apps/web/features/auth/actions.ts` — instrumentation on
+  `signInWithPassword` success/failure in `signInAction`
+- `supabase/migrations/20260201070000_restore_handle_new_user_trigger.sql`
+  — new; restores the trigger and backfills existing orphaned users,
+  **must be applied to the live database** (same outstanding-application
+  constraint as every migration in this campaign — this environment
+  cannot reach the live project to apply it directly)
+
+### What remains outstanding
+
+1. **Apply `20260201070000_restore_handle_new_user_trigger.sql` to the
+   live database.** This is the fix for the exact reported symptom
+   (empty `profiles` table) and does not require anyone to sign in again
+   for existing users to be repaired.
+2. **Attempt a real sign-in against the current Vercel deployment** once
+   the migration above is applied, and read the function logs — the
+   instrumentation added this turn will show exactly which of the five
+   checkpoints is failing, if any still are, with the actual Supabase
+   error code/message/details attached rather than a silent `null`.
+3. If the logs from step 2 show the self-heal insert itself is still
+   failing even with the trigger restored (which would only matter for
+   any future drift, since the trigger is now the primary path), the
+   `insertError` fields logged will name the exact Postgres error to act
+   on next — no further guessing required.
