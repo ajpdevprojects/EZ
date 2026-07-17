@@ -18,12 +18,22 @@ export async function updateSession(request: NextRequest) {
   // Supabase's Next.js SSR guide specifies for this exact reason.
   let response = NextResponse.next({ request });
 
+  // Diagnostic only — names and value lengths, never raw token values.
+  console.error("[proxy updateSession] cookies on incoming request", {
+    path: request.nextUrl.pathname,
+    names: request.cookies.getAll().map((c) => `${c.name} (${c.value.length}b)`),
+  });
+
   const supabase = createServerClient(env.url, env.anonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        console.error("[proxy updateSession] setAll invoked — session is being refreshed/rotated", {
+          path: request.nextUrl.pathname,
+          names: cookiesToSet.map((c) => c.name),
+        });
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
@@ -35,7 +45,14 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getUser();
+  console.error("[proxy updateSession] auth.getUser() result", {
+    path: request.nextUrl.pathname,
+    userId: data.user?.id ?? null,
+    errorCode: error?.code,
+    errorStatus: error?.status,
+    errorMessage: error?.message,
+  });
 
   return response;
 }
