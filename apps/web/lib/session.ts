@@ -3,6 +3,7 @@ import "server-only";
 import { DEMO_PROFILE, mapProfile } from "@ez/lib";
 import { createClient } from "@ez/lib/supabase/server";
 import type { Profile } from "@ez/types";
+import { cache } from "react";
 
 export interface SessionResult {
   profile: Profile;
@@ -25,8 +26,25 @@ export interface SessionResult {
  * already have created on signup — a safety net for whenever that
  * trigger didn't run (schema drift, a migration that failed partway,
  * a user created before the trigger existed), not the primary mechanism.
+ *
+ * Wrapped in React's cache() so a single request only ever resolves the
+ * session once: every route under (app)/layout.tsx calls this again from
+ * its own page.tsx (e.g. /home/page.tsx), and without memoization each
+ * call independently constructs its own Supabase client and calls
+ * auth.getUser(). Confirmed locally against a real GoTrueClient + mock
+ * auth server: when the access token is near its expiry margin,
+ * auth.getUser() proactively refreshes and rotates the (single-use)
+ * refresh token. Two independent, un-memoized calls within the same
+ * request would race for that single-use token — one wins, the other
+ * gets "Invalid Refresh Token" from Supabase, and only survives via the
+ * SDK's still-valid-access-token fallback. If the access token were also
+ * already past its actual expiry when that race happened, the losing
+ * call would legitimately come back empty, and this function would
+ * report a genuinely signed-in user as signed out. cache() removes the
+ * race entirely by making the second call reuse the first call's result
+ * instead of re-deriving it.
  */
-export async function getCurrentSession(): Promise<SessionResult | null> {
+export const getCurrentSession = cache(async function getCurrentSession(): Promise<SessionResult | null> {
   const supabase = await createClient();
 
   if (!supabase) {
@@ -88,4 +106,4 @@ export async function getCurrentSession(): Promise<SessionResult | null> {
   console.error("[getCurrentSession] self-heal insert succeeded", { userId: user.id });
 
   return { profile: mapProfile(createdRow), isDemo: false };
-}
+});
