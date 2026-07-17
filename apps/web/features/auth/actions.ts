@@ -43,12 +43,24 @@ export async function signInAction(
     return { error: "Sign in isn't available yet — Supabase hasn't been configured." };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("[signInAction] signInWithPassword failed", {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return { error: error.message };
+  }
+
+  console.error("[signInAction] signInWithPassword succeeded", {
+    userId: data.user?.id,
+    hasSession: Boolean(data.session),
+  });
 
   redirect("/home");
 }

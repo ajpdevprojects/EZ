@@ -35,11 +35,21 @@ export async function getCurrentSession(): Promise<SessionResult | null> {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) return null;
+  if (!user) {
+    if (userError) {
+      console.error("[getCurrentSession] auth.getUser() returned no user", {
+        code: userError.code,
+        status: userError.status,
+        message: userError.message,
+      });
+    }
+    return null;
+  }
 
-  const { data: profileRow } = await supabase
+  const { data: profileRow, error: selectError } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
@@ -49,16 +59,33 @@ export async function getCurrentSession(): Promise<SessionResult | null> {
     return { profile: mapProfile(profileRow), isDemo: false };
   }
 
+  console.error("[getCurrentSession] profile lookup failed for an authenticated user, attempting self-heal insert", {
+    userId: user.id,
+    selectErrorCode: selectError?.code,
+    selectErrorMessage: selectError?.message,
+  });
+
   const fullName =
     typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null;
 
-  const { data: createdRow } = await supabase
+  const { data: createdRow, error: insertError } = await supabase
     .from("profiles")
     .insert({ id: user.id, email: user.email ?? "", full_name: fullName })
     .select()
     .single();
 
-  if (!createdRow) return null;
+  if (!createdRow) {
+    console.error("[getCurrentSession] self-heal insert failed — falling back to signed-out", {
+      userId: user.id,
+      insertErrorCode: insertError?.code,
+      insertErrorMessage: insertError?.message,
+      insertErrorDetails: insertError?.details,
+      insertErrorHint: insertError?.hint,
+    });
+    return null;
+  }
+
+  console.error("[getCurrentSession] self-heal insert succeeded", { userId: user.id });
 
   return { profile: mapProfile(createdRow), isDemo: false };
 }

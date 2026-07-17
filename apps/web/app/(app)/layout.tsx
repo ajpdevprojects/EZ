@@ -32,8 +32,16 @@ const NAV_ITEMS: BottomNavItem[] = [
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getCurrentSession();
 
-  if (!session) redirect("/sign-in");
-  if (!session.isDemo && !session.profile.onboardingCompletedAt) redirect("/onboarding");
+  if (!session) {
+    console.error("[AppLayout] getCurrentSession() returned null — redirecting to /sign-in");
+    redirect("/sign-in");
+  }
+  if (!session.isDemo && !session.profile.onboardingCompletedAt) {
+    console.error("[AppLayout] session found but onboarding incomplete — redirecting to /onboarding", {
+      userId: session.profile.id,
+    });
+    redirect("/onboarding");
+  }
 
   const unreadCount = await getUnreadNotificationCount(session.profile.id, session.isDemo);
 
