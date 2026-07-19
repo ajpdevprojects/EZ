@@ -1,6 +1,31 @@
 # Supabase Migration Application Guide
 
-**Status:** 7 migrations prepared but NOT YET APPLIED to live database
+## 🚨 URGENT — 2026-07-19: apply `20260201080000_restore_api_role_grants.sql`
+
+Live verification confirmed sign-in bounces back to the login screen with
+`permission denied for table profiles` (Postgres 42501). The live database's
+tables have RLS policies but **no table-level grants for the Supabase API
+roles** (`anon`, `authenticated`, `service_role`) — so every app query
+against every table is denied before RLS is even evaluated. This affects all
+sixteen app tables, not just `profiles` (onboarding completion needs UPDATE;
+the app layout reads `notifications` right after login).
+
+Do **not** apply only the `GRANT SELECT, INSERT ON public.profiles TO
+authenticated;` from the error hint — that fixes one table's two verbs and
+leaves the rest of the app broken. Apply the migration instead: it restores
+the standard Supabase grants for all objects in `public`, sets default
+privileges so future tables inherit them, and refuses to run if any table
+somehow has RLS disabled (so it can never expose data). Row-level security
+policies are unchanged; per-row access is still enforced exactly as before.
+
+Paste the contents of `supabase/migrations/20260201080000_restore_api_role_grants.sql`
+into the Supabase Dashboard SQL Editor and run it (safe to re-run). Then sign
+in again — the login bounce should be resolved immediately; no data repair
+is needed.
+
+---
+
+**Status:** migrations prepared but NOT YET APPLIED to live database
 
 ## ❌ What Has NOT Been Done
 The migrations are ready but have NOT been applied to your live Supabase project due to network restrictions in this cloud environment. Direct database connections and REST API calls are timing out.
@@ -86,6 +111,15 @@ The migrations MUST be applied in this exact order:
 
 7. **20260201050000_overnight_activity.sql** - Background job tracking
    - Creates: cron job and background job tables
+
+8. **20260201060000_profiles_insert_policy.sql** - RLS insert policy for profiles
+   - Allows the signed-in user to create their own profile row (self-heal path)
+
+9. **20260201070000_restore_handle_new_user_trigger.sql** - Profile-creation trigger + backfill
+   - Restores `handle_new_user()` / `on_auth_user_created` and backfills profiles for existing users
+
+10. **20260201080000_restore_api_role_grants.sql** - API-role table grants (see 🚨 above)
+    - Restores the standard Supabase grants for `anon`/`authenticated`/`service_role` and default privileges
 
 ## ✅ How to Verify Migrations Were Applied Successfully
 
