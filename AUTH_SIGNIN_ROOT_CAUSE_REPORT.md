@@ -1047,3 +1047,145 @@ of blind inference.
    secret not fully propagated) — named here as the leading hypothesis
    given the evidence, not confirmed, since nothing in this sandbox can
    reach that dashboard.
+
+---
+
+## Addendum — 2026-07-19 (sixth): proving/disproving the `auth.getUser()` vs `auth.uid()` identity divergence
+
+Scope for this addendum, per explicit instruction: `profiles`, RLS, and
+policies are proven correct (fifth addendum) and **out of scope here**.
+This addendum investigates only whether GoTrue (`auth.getUser()`) and
+PostgREST (`auth.uid()`) can disagree about the same request's identity,
+tracing PostgREST request authentication, JWT propagation, the Supabase
+SSR client, `createServerClient()`, cookie propagation, and the
+`Authorization` header — using this repository's actual vendored library
+code, not assumption.
+
+### Capturing one complete failing login — what this sandbox can and cannot do
+
+I do not have network access to the live Supabase project or Vercel
+deployment (unchanged, stated in every report on this branch). I cannot
+capture a real failing production login. What follows instead is the most
+rigorous substitute available: tracing the *actual* `@supabase/ssr`
+(0.12.3) and `@supabase/supabase-js` (2.110.7) source as vendored in this
+repo's `node_modules`, then running this repository's *actual*
+`session.ts` self-heal code (including `debug_whoami()`, on this branch)
+through a real Next.js production build and real Chromium browser against
+a mock server enhanced to genuinely decode every JWT it receives — not
+just check it's *a* valid token, but report exactly what `sub`/`role` each
+individual request carried, at each of `/auth/v1/user`, `/rest/v1/profiles`,
+and `/rest/v1/rpc/debug_whoami`.
+
+### Source-code trace: how the Authorization header is chosen for each call
+
+- `supabase.auth.getUser()` and the `_getSessionToken()` used internally
+  by every `.from()`/`.rpc()` call (`SupabaseClient.ts`) **both** resolve
+  through the identical `GoTrueClient.__loadSession()` (`auth-js`
+  `GoTrueClient.ts`), which reads the session via
+  `getItemAsync(this.storage, this.storageKey)`.
+- `this.storage`, for a server client, is the cookie-backed adapter built
+  by `@supabase/ssr`'s `createStorageFromOptions` — its `getItem` checks
+  an in-memory `setItems` overlay *before* falling back to reading
+  cookies. Any refresh triggered by `getUser()` writes into that same
+  overlay via `setItem`, so a later `getSession()` call on the **same
+  client instance** (same closure) sees the update immediately.
+- `session.ts` constructs exactly **one** `supabase` client
+  (`const supabase = await createClient()`) and reuses it for
+  `auth.getUser()`, `.from("profiles")`, and `.rpc("debug_whoami")` —
+  confirmed by reading the file directly, not recalled.
+- `.rpc()` and `.from()` both route through the same `this.rest`
+  (`PostgrestClient`) using the same `this.fetch` (`fetchWithAuth`),
+  which resolves the bearer via `realToken ?? (allowKeyAsBearer ?
+  supabaseKey : null)` — i.e., the plain anon key is used as a fallback
+  **only if `_getSessionToken()` returns null**, and never otherwise.
+- Neither `packages/lib/src/supabase/server.ts` nor `proxy.ts` sets any
+  static/custom `Authorization` header at client construction (confirmed
+  by grep) that could pre-empt this per-request resolution.
+
+**Conclusion from source alone: within a single `createClient()` instance
+in a single request, there is no code path by which `getUser()` and a
+later `.rpc()`/`.from()` call can resolve to different sessions.** They
+share the same storage, the same overlay, the same closure.
+
+### Empirical confirmation: real app code, JWT-decoding mock, two conditions
+
+Ran the actual self-heal path (this branch's `session.ts`, real
+`createServerClient()`, real Next.js RSC execution, real cookies) through
+a mock that decodes and logs the `sub`/`role` actually carried by every
+request to `/auth/v1/user`, `/rest/v1/profiles`, and
+`/rest/v1/rpc/debug_whoami`:
+
+1. **Healthy conditions** (1-hour token TTL): 113 identity-log samples
+   across the full login/navigate/self-heal/sign-out matrix. Every
+   authenticated request carried the identical `sub` and
+   `role: authenticated`. Zero anon-key fallbacks, zero invalid
+   signatures.
+2. **Adversarial conditions** (8-second TTL forcing a mid-session refresh,
+   chunked cookies): 59 identity-log samples spanning the token-expiry
+   boundary. Same result — identical `sub` on every request, zero
+   divergence, before and after the refresh.
+
+**This repository's own code, running for real, could not be made to
+produce the divergence — under any condition constructed.**
+
+### Correcting a hypothesis from the fifth addendum
+
+The fifth addendum named a GoTrue/PostgREST JWT-secret mismatch as the
+"leading hypothesis." Re-examining it against real PostgREST semantics:
+a signature-verification failure at PostgREST produces an HTTP **401**
+with a JWT-specific error (e.g. `PGRST301`), not a `42501` RLS violation
+— PostgREST only reaches RLS evaluation *after* successfully
+authenticating the request as some role. The live evidence was `42501`,
+not `401`. **A secret mismatch is therefore inconsistent with the
+reported symptom and is retracted as the leading hypothesis.**
+
+For `42501` to occur, PostgREST must have accepted *some* credential for
+the request and resolved it to a role/`auth.uid()` that fails the
+`WITH CHECK`. Given the client-side "send the anon key when there's no
+session token" fallback exists in the library (confirmed above) but is
+proven not to fire in this repo's own code under any local condition,
+the only evidence-consistent remaining explanation is that the
+`Authorization` header PostgREST actually received on the live failing
+request differed from what this repository's client code sent — which
+places the cause **outside this repository's code**, in the request path
+between the deployed application and the live Supabase project (a
+proxy/edge layer altering headers, or a live-project-specific condition
+this sandbox cannot observe or construct, since it would require the
+real network path).
+
+### What "prove or disprove" resolves to
+
+- **Disproven**: the divergence is caused by anything in
+  `apps/web/lib/session.ts`, `packages/lib/src/supabase/{server,client,
+  proxy}.ts`, or a defect in `@supabase/ssr`/`@supabase/supabase-js` as
+  used here. Both a full source trace and empirical black-box testing of
+  the real code, under healthy and adversarial conditions, are
+  consistent and negative.
+- **Not provable or disprovable from this sandbox**: whether the live
+  request path (Vercel ↔ Supabase project) itself alters or drops the
+  `Authorization` header, or any other live-project-specific condition
+  outside this repository's code. This requires the one artifact this
+  sandbox cannot produce: `debug_whoami()`'s output from a real failing
+  login, already built and waiting on this branch.
+
+### Minimal fix
+
+**No code fix is proposed.** Proposing one would mean changing code to
+"fix" a divergence this investigation could not locate anywhere in that
+code — which would fix nothing and misrepresent the finding. The correct
+minimal next action is exactly what was already prepared and pushed on
+this branch: apply `20260201090000_add_whoami_diagnostic.sql` to the
+live database, attempt one real login, and read the
+`[getCurrentSession] database's view of this request's auth context` log
+line from Vercel's function output. That single log line —
+`effectiveRole` and `resolvedAuthUid` compared against the `userId`
+logged alongside it — is the one piece of evidence that resolves this
+definitively, and nothing this sandbox can construct substitutes for it.
+
+### Files changed this turn
+
+None in the repository. Scratch-only test tooling (a JWT-decoding mock
+server) was used for local reproduction and is not part of this
+repository; the diagnostic branch's existing changes
+(`debug_whoami()`, `session.ts`'s logging) are unchanged from the prior
+commit.
