@@ -758,3 +758,97 @@ at every token-expiry boundary, and on *every* navigation if the
 project's JWT expiry is at or below the SDK's 90-second refresh margin.
 That dashboard setting (Authentication → Sessions → JWT expiry) is still
 worth checking, and remains the one thing this environment cannot see.
+
+---
+
+## Addendum — 2026-07-19 (fourth): real-production failure traced to missing API-role grants
+
+Real verification against the live Supabase project, after merging the
+redirect-race fix (`e1afbf1`), still failed: sign-in succeeds, the app
+attempts profile initialization, the terminal shows
+`permission denied for table profiles` with hint
+`GRANT SELECT, INSERT ON public.profiles TO authenticated;`, and the
+browser ends back at the sign-in flow.
+
+### What the production log actually proves
+
+The quoted error comes from the instrumented self-heal path in
+`apps/web/lib/session.ts` (`insertErrorHint` is a field only that log
+line emits). For that line to fire at all, everything before it must
+have succeeded: middleware saw the cookies, `auth.getUser()` returned a
+real user server-side, the profile `select` ran and failed, and the
+self-heal `insert` ran and failed. **The entire session pipeline —
+cookies, middleware, token handling, Server Components — is working in
+production.** The failure is one layer down: PostgreSQL error 42501,
+table-privilege denial, which happens before RLS is even evaluated.
+`getCurrentSession()` then correctly reports `null` (both its reads
+failed), and `(app)/layout.tsx` redirects to `/sign-in` — the redirect
+is a downstream symptom, not a defect.
+
+### Root cause (this is (A), not (B))
+
+The live database's tables have RLS enabled and policies defined, but
+**no table-level grants for the Supabase API roles** (`anon`,
+`authenticated`, `service_role`). No migration in this repository ever
+issues a `GRANT` — a standard Supabase project doesn't need one, because
+the platform configures `ALTER DEFAULT PRIVILEGES` for the role its
+tooling creates tables as. This project's live schema was assembled at
+least partly outside that path (already established when
+`handle_new_user()` was found missing in production), by a role whose
+default privileges don't cover the API roles — leaving tables with
+policies but no underlying privileges.
+
+Reproduced exactly against local PostgreSQL 16 running this repo's
+migrations with no platform grants: as `authenticated` with a valid
+`auth.uid()`, SELECT/INSERT/UPDATE on `public.profiles` all fail with
+`permission denied for table profiles`, and `public.notifications` (read
+by the app layout immediately after login) fails identically. The blast
+radius is all sixteen app tables — which is also why the hinted minimal
+`GRANT SELECT, INSERT ON public.profiles` is the wrong fix: it would
+un-bounce login while leaving onboarding completion (UPDATE on
+`profiles`) and every other feature broken.
+
+This also retro-explains the entire campaign's central mystery: "the
+server doesn't see the session the browser has" was never true. The
+server always saw the session; before instrumentation existed, the
+42501 on the profile read was silently swallowed and collapsed into the
+same `null` as "not signed in".
+
+### Fix
+
+`supabase/migrations/20260201080000_restore_api_role_grants.sql` — new.
+Restores the standard Supabase model (grants gate verbs, RLS gates
+rows): `GRANT ALL` on all tables/sequences/routines in `public` to the
+three API roles, plus matching `ALTER DEFAULT PRIVILEGES` so the next
+migration can't silently recreate this incident. A safety gate makes the
+migration refuse to run if any `public` table has RLS disabled, so it
+can never expose an unprotected table. RLS policies are untouched.
+
+### Verification (local PostgreSQL 16, real migration files)
+
+- Before the migration: authenticated SELECT/INSERT/UPDATE on
+  `profiles` and SELECT on `notifications` all denied (42501) — exact
+  production reproduction, while the SECURITY DEFINER trigger still
+  creates rows (matching production's "rows exist but app can't read
+  them").
+- After: own-profile SELECT/UPDATE succeed (onboarding completion),
+  self-heal INSERT succeeds for an orphaned user, notifications read
+  succeeds.
+- Security boundaries unchanged: another user's profile SELECT returns
+  0 rows, cross-user INSERT fails with an RLS violation, cross-user
+  UPDATE affects 0 rows, `anon` sees 0 rows, all sixteen tables have
+  RLS enabled.
+- Safety gate verified: with RLS deliberately disabled on one table,
+  the migration aborts before issuing any grant.
+- Full migration sequence applies cleanly from scratch and the new
+  migration is idempotent on re-run.
+
+### What must happen in the live project
+
+Apply `20260201080000_restore_api_role_grants.sql` via the Supabase
+Dashboard SQL editor (or `supabase db push --linked`). No data repair
+and no re-signup is needed; the next sign-in should proceed to
+onboarding/home immediately. This environment has no network path to
+the live project (unchanged constraint), so this application step
+remains the owner's — see MIGRATION_APPLICATION_GUIDE.md, updated with
+this migration marked urgent.
