@@ -17,7 +17,10 @@ export async function createClient() {
   // this is safe to leave in logs (a leaked cookie value is a hijackable
   // session; a leaked name/length is not).
   console.error("[supabase/server createClient] cookies visible to this request", {
-    names: cookieStore.getAll().map((c) => `${c.name} (${c.value.length}b)`),
+    // value can be undefined (not just "") for a cookie deleted by the
+    // middleware earlier in this same request — reading .length off it
+    // unguarded crashed every page render that followed a session wipe.
+    names: cookieStore.getAll().map((c) => `${c.name} (${c.value?.length ?? 0}b)`),
   });
 
   return createServerClient<Database>(env.url, env.anonKey, {
