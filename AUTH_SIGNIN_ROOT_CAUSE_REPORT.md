@@ -852,3 +852,198 @@ onboarding/home immediately. This environment has no network path to
 the live project (unchanged constraint), so this application step
 remains the owner's — see MIGRATION_APPLICATION_GUIDE.md, updated with
 this migration marked urgent.
+
+---
+
+## Addendum — 2026-07-19 (fifth): PGRST116 + 42501 after the grants migration — investigation scoped to `profiles`/RLS/self-heal only, per explicit instruction
+
+New live evidence, gathered after `20260201080000_restore_api_role_grants.sql`
+was applied to the live project: sign-in succeeds, but the browser console
+now shows `PGRST116` ("Cannot coerce the result to a single JSON object")
+followed by `42501` (`new row violates row-level security policy for table
+"profiles"`), and the browser still ends up back at sign-in. Per explicit
+instruction, this investigation stayed entirely within `public.profiles`,
+its RLS policies, and the self-heal logic in `apps/web/lib/session.ts` —
+cookies, middleware, and token refresh were not reopened.
+
+### Answering the required questions, with evidence
+
+**1–2. The exact query and why it produces PGRST116.** Two `.single()`
+calls exist in `session.ts`: the profile lookup
+(`.from("profiles").select("*").eq("id", user.id).single()`) and the
+self-heal insert's return (`.insert(...).select().single()`). PGRST116 is
+PostgREST's error for `.single()`/`.maybeSingle()` receiving 0 or 2+ rows.
+Since `id` is the table's primary key, the `id`-filtered lookup can
+structurally never return 2+ rows — so PGRST116 there always means exactly
+0 rows.
+
+**3–4. Does a profile already exist, and why doesn't the SELECT return
+one row if so?** This is the one place an initial hypothesis had to be
+corrected. I first assumed 0-rows-then-RLS-denied-insert proved the row
+didn't exist yet. I built a second local reproduction to test that
+directly — the *converse* case, where the row provably exists (created by
+the `SECURITY DEFINER` trigger, which bypasses RLS/grants entirely) but
+the querying role's `auth.uid()` fails to resolve — and it reproduces the
+exact same 0-rows-then-42501 sequence. **PGRST116 on this query does not
+distinguish "no row exists" from "a row exists but this request can't see
+it."** Whether a profile already exists for the affected live user cannot
+be determined from the browser console evidence alone; it requires a
+direct query against the live table (question 8, below).
+
+**5–6. Why does the self-heal INSERT violate the RLS policy, and what are
+the exact policies?** Pulled directly from a real PostgreSQL 16 instance
+running this repository's actual migration files (not inferred, not typed
+from memory):
+
+```
+policyname                          | cmd    | using              | with_check
+profiles are insertable by owner    | INSERT |                    | (auth.uid() = id)
+profiles are viewable by owner      | SELECT | (auth.uid() = id)  |
+profiles are updatable by owner     | UPDATE | (auth.uid() = id)  | (auth.uid() = id)
+```
+
+Exactly three policies, matching the migrations, no duplicates, no
+`RESTRICTIVE` policies, nothing dashboard-authored layered on top (in this
+local reconstruction — the live project's policy set can only be confirmed
+by running the same query there, see below). Two controlled reproductions,
+run against this exact policy set:
+
+- Insert as `authenticated` with `auth.uid()` correctly resolving to the
+  target id → succeeds.
+- The *only* change: `auth.uid()` resolves to `NULL` (session variable
+  `request.jwt.claim.sub` unset, simulating a request PostgREST does not
+  recognize as this user) → fails with **the identical, verbatim error
+  text reported live**: `new row violates row-level security policy for
+  table "profiles"`.
+
+The insert statement and the policy are both correct in isolation. The
+failure is fully explained by, and only by, `auth.uid()` not resolving to
+the caller's id for that specific query.
+
+**7. Does `handle_new_user()` already insert a profile?** Yes — confirmed
+by re-running the trigger migration locally: a fresh `auth.users` insert
+produces a matching `profiles` row automatically, via `SECURITY DEFINER`,
+unaffected by grants or RLS.
+
+**8. Duplicate profile rows?** Structurally impossible for the `id`-filtered
+lookup specifically (primary key). Whether the live `profiles` table has
+any duplicate/orphaned data by some other criterion cannot be checked from
+this sandbox (no network path to the live project) — see the verification
+queries below.
+
+**9. Is `.single()` used appropriately?** No — found and fixed as part of
+this investigation, independent of the auth-context question. Every other
+`profiles` query in the codebase
+(`features/jobs/actions.ts`, `features/coach/actions.ts`) correctly uses
+`.maybeSingle()` for a lookup that may legitimately find nothing.
+`session.ts`'s initial lookup used `.single()`, which turns the ordinary
+"no profile yet, about to self-heal" case into a PostgREST error object
+identical in shape to a real failure — which is very likely why this was
+visible in the browser console at all as something alarming. Fixed to
+`.maybeSingle()`. This is a real fix, but it changes *presentation*, not
+outcome — the code already correctly treated any falsy `profileRow` as
+"attempt self-heal" either way, so it does not by itself explain the
+subsequent 42501.
+
+### Verify the live database — what I can and cannot do from here
+
+I have no network path to the live Supabase project (unchanged constraint
+from every prior report on this branch), so I cannot run these myself.
+Exact queries to answer questions 3/8/9 conclusively, run as a superuser
+via the Supabase SQL editor (which bypasses RLS, so it shows ground truth):
+
+```sql
+-- Does the row already exist? Duplicates by any key?
+select * from public.profiles where id = '<the affected user's auth.users.id>';
+
+-- Exact live policy set (compare against the table above)
+select policyname, cmd, roles, qual, with_check
+from pg_policies where schemaname = 'public' and tablename = 'profiles';
+```
+
+The one question those can't answer — what the *application's own
+requests* resolve `auth.uid()` to — needed a different approach, since I
+cannot attach to a live request from this sandbox either.
+
+### What was added: a diagnostic the next real login will answer directly
+
+`supabase/migrations/20260201090000_add_whoami_diagnostic.sql` adds
+`public.debug_whoami()`, a minimal `SECURITY INVOKER` SQL function
+returning the calling request's own `current_user` (`anon` vs
+`authenticated`) and `auth.uid()`. It discloses nothing a caller couldn't
+already read out of their own JWT. `session.ts` now calls it via
+`supabase.rpc("debug_whoami")` immediately after a failed profile lookup,
+logging `effectiveRole` / `resolvedAuthUid` / whether it matches
+`user.id`, right before attempting the self-heal insert. Verified locally
+(real Postgres, three role/claim combinations) that it correctly
+distinguishes all three cases that matter here: properly authenticated,
+`authenticated` role but no resolvable `sub` claim, and `anon`.
+
+This directly closes the one gap local reproduction cannot close by
+itself: the **next real login attempt** will show, in Vercel's function
+logs, exactly what the database believes this request's identity is at
+the moment the self-heal insert is attempted — proving or disproving,
+with a single log line, whether the request context reaching PostgREST
+matches the one that `auth.getUser()` (a separate service, GoTrue)
+already validated. If `effectiveRole` is `anon` or `resolvedAuthUid`
+doesn't match the logged `userId`, the fault is in how the live project's
+API layer authenticates PostgREST requests for this specific user/token —
+a project-configuration fact (e.g., GoTrue's and PostgREST's JWT
+verification going out of sync after a secret rotation, or a gateway
+stripping the Authorization header for REST calls) outside anything this
+repository's code or migrations control, and outside the scope of this
+investigation's instructions. If it matches, the fault is something else
+this diagnostic will help find on the next attempt, without another round
+of blind inference.
+
+### Verification performed
+
+- All 10 migrations (including the new diagnostic one) apply cleanly from
+  a fresh database, in order, against real PostgreSQL 16.
+- `debug_whoami()` verified locally to return the correct
+  role/`auth.uid()` for all three scenarios above.
+- `pnpm typecheck` clean (the new RPC call is fully typed against
+  `database.types.ts`, not cast through `any`).
+- `pnpm lint` — 0 errors (1 pre-existing, unrelated warning).
+- `pnpm test` — 185/185 (the `.single()` → `.maybeSingle()` change and the
+  new `rpc()` call required updating `session.test.ts`'s hand-built mock;
+  updated and re-verified, still exercises the same reproduction/regression
+  cases as before).
+- Full browser matrix against a production build (`next build && next
+  start`) driven through real Chromium, using a mock Supabase forced to
+  simulate an orphaned first-login user (no profile row) on every request:
+  login → self-heal → `/home` succeeds; the new diagnostic log line fires
+  on every self-heal attempt with the correct role/uid; zero server
+  errors. Re-run against a healthy (non-orphaned) mock: self-heal and the
+  diagnostic call are correctly skipped entirely, zero server errors — no
+  regression to the common path.
+- Full repo `pnpm test:e2e` — 58/58 (demo mode, unaffected by this
+  change, confirming no regression).
+
+### Files changed this turn
+
+- `apps/web/lib/session.ts` — `.single()` → `.maybeSingle()` on the
+  profile lookup; new `debug_whoami()` diagnostic call + logging on the
+  self-heal path.
+- `apps/web/lib/session.test.ts` — updated mock to match
+  (`maybeSingle`/`rpc`).
+- `packages/lib/src/supabase/database.types.ts` — typed the new RPC.
+- `supabase/migrations/20260201090000_add_whoami_diagnostic.sql` — new.
+
+### What remains outstanding
+
+1. Apply `20260201090000_add_whoami_diagnostic.sql` to the live database
+   (same mechanism as every prior migration in this campaign).
+2. One real sign-in attempt against the live deployment, with the
+   `[getCurrentSession] database's view of this request's auth context`
+   log line read from Vercel's function logs — this is the one piece of
+   evidence this sandbox cannot produce, and it will show definitively
+   whether the fault is a request-identity mismatch at the API layer (in
+   which case the fix is a Supabase project setting, not code in this
+   repo) or something else, without further guessing.
+3. If it does show a mismatch, check the Supabase Dashboard's Project
+   Settings → API → JWT Settings for a secret/signing-key state that's
+   inconsistent between GoTrue and PostgREST (e.g. a rotated legacy JWT
+   secret not fully propagated) — named here as the leading hypothesis
+   given the evidence, not confirmed, since nothing in this sandbox can
+   reach that dashboard.

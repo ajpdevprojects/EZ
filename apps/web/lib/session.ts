@@ -80,16 +80,39 @@ export const getCurrentSession = cache(async function getCurrentSession(): Promi
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profileRow) {
     return { profile: mapProfile(profileRow), isDemo: false };
   }
 
-  console.error("[getCurrentSession] profile lookup failed for an authenticated user, attempting self-heal insert", {
+  // A profile genuinely not existing yet (first login) is expected and not
+  // itself evidence of a problem — maybeSingle() (vs single()) reflects
+  // that: data/error are both null rather than surfacing a PostgREST
+  // "0 rows" error for a normal, self-healable case. selectError here means
+  // something else actually went wrong (RLS denial, connection issue).
+  console.error("[getCurrentSession] no profile row visible for an authenticated user, attempting self-heal insert", {
     userId: user.id,
     selectErrorCode: selectError?.code,
     selectErrorMessage: selectError?.message,
+  });
+
+  // Local reproduction against this repo's real migrations (see
+  // 20260201090000_add_whoami_diagnostic.sql) proved the profiles table,
+  // its RLS policies, and this exact insert statement are all correct in
+  // isolation — the production 42501 on the self-heal insert reproduces
+  // only when the database fails to resolve auth.uid() to this user's id,
+  // which local reproduction cannot observe directly against the live
+  // project. This makes that fact directly visible in the next production
+  // attempt's logs instead of requiring another round of inference.
+  const { data: whoami, error: whoamiError } = await supabase.rpc("debug_whoami").maybeSingle();
+  console.error("[getCurrentSession] database's view of this request's auth context", {
+    userId: user.id,
+    effectiveRole: whoami?.effective_role ?? null,
+    resolvedAuthUid: whoami?.resolved_auth_uid ?? null,
+    authUidMatchesUser: whoami?.resolved_auth_uid === user.id,
+    whoamiErrorCode: whoamiError?.code,
+    whoamiErrorMessage: whoamiError?.message,
   });
 
   const fullName =

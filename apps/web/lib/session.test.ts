@@ -32,12 +32,23 @@ function makeSupabaseMock(options: {
     auth: {
       getUser: async () => ({ data: { user: MOCK_USER }, error: null }),
     },
+    // Stands in for the debug_whoami() diagnostic RPC added alongside the
+    // API-role-grants investigation. Not under test here (that's
+    // proxy.test.ts / the migration's own SQL-level verification) — this
+    // mock just needs to satisfy the call session.ts makes on the self-heal
+    // path without throwing.
+    rpc: () => ({
+      maybeSingle: async () => ({
+        data: { effective_role: "authenticated", resolved_auth_uid: MOCK_USER.id },
+        error: null,
+      }),
+    }),
     from: (table: string) => {
       if (table !== "profiles") throw new Error(`unexpected table ${table}`);
       return {
         select: () => ({
           eq: () => ({
-            single: async () => ({ data: options.profileRow, error: options.profileError }),
+            maybeSingle: async () => ({ data: options.profileRow, error: options.profileError }),
           }),
         }),
         insert: (row: Record<string, unknown>) => {

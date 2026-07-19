@@ -322,6 +322,11 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      debug_whoami: {
+        Args: Record<PropertyKey, never>;
+        Returns: { effective_role: string | null; resolved_auth_uid: string | null }[];
+      };
+    };
   };
 }
