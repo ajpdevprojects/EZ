@@ -677,3 +677,84 @@ correctly at every call site.
    hit this path, not just an edge case. This is Supabase project
    configuration, not application code, so it's named here rather than
    changed.
+
+---
+
+## Addendum — 2026-07-19 (third): the failure reproduced end-to-end, and two real defects fixed
+
+Every prior local reproduction attempt on this branch failed to make the
+real `@supabase/ssr` stack run inside Next.js in this sandbox — the dev
+server's outbound fetches were intercepted by the sandbox's HTTP proxy
+("Host not in allowlist"). This session cleared that blocker (`NO_PROXY`
+for loopback + a production `next build && next start` instead of the dev
+server) and, for the first time, drove the complete real flow — the
+actual `signInAction`, middleware, cookie, and RSC code paths, unmodified
+— through a real Chromium browser against a GoTrue-faithful mock Supabase
+(password grant, single-use refresh-token rotation with the 10-second
+reuse interval, family revocation on late reuse, PostgREST `profiles`).
+
+### The reproduction
+
+With the access-token TTL forced inside `@supabase/auth-js`'s 90-second
+proactive-refresh margin and a session large enough to chunk the auth
+cookie (both true of real deployments at the expiry boundary), the exact
+reported symptom appeared: **login succeeds, `/home` bounces to
+`/sign-in`, and the browser's session cookies are destroyed** — plus a
+500 on `/home` nobody had reported yet. Sequence, from the server logs:
+
+1. Landing on `/home` fires ~10 parallel requests (the page plus Next.js
+   prefetching every visible nav link). Each runs the middleware, each
+   holding the same cookie with the same **single-use** refresh token.
+2. One request wins the refresh race. Losers get
+   `refresh_token_not_found`. On that error the SDK wipes the session —
+   and the middleware's `setAll` faithfully forwarded that wipe as cookie
+   deletions to the browser, destroying the *winner's* freshly rotated
+   session mid-navigation. Next request: no cookies at all → `/sign-in`.
+3. Independently, the cookie diagnostic added on 2026-07-17 read
+   `c.value.length` off `cookies().getAll()` entries; a cookie deleted by
+   the middleware earlier in the same request surfaces there with
+   `value === undefined`, crashing every page render that followed a
+   session wipe with a 500 (`TypeError: Cannot read properties of
+   undefined (reading 'length')` — this exact error was recovered from
+   the built chunk and matches the deployed instrumentation).
+
+### Fixes
+
+- `packages/lib/src/supabase/proxy.ts` — `setAll` now suppresses a
+  **pure session wipe** (every cookie an empty-value deletion), which in
+  middleware only ever means "this request's refresh failed". A lost
+  refresh race no longer signs the user out; the winner's cookies stand.
+  Mixed writes — including stale-chunk cleanup on a successful rotation —
+  are still applied in full, and real sign-out (a Server Action, not
+  middleware) still clears cookies, verified end-to-end.
+- `packages/lib/src/supabase/server.ts` + `proxy.ts` — cookie
+  diagnostics are null-safe (`c.value?.length ?? 0`); they can no longer
+  500 a render.
+- `packages/lib/src/supabase/proxy.test.ts` — new regression tests: a
+  successful rotation applies sets and stale-chunk removals to both the
+  response and the mutated request; an all-deletions `setAll` is fully
+  suppressed on both; unconfigured Supabase no-ops.
+
+### Verification
+
+Full browser matrix against the production build, at 8-second token TTL
+with chunked cookies (worst case): sign-in → `/home`; refresh stays;
+navigation past full token expiry refreshes and stays (previously: 500 +
+session wipe + `/sign-in`); new tab stays; client-side navigation across
+protected pages; browser back; deep links; a second full-expiry idle
+period; `/` → `/home`; sign-out → `/welcome` with cookies cleared;
+`/home` signed out → `/sign-in`; re-login → `/home`. Also the same
+matrix at the default 1-hour TTL. `pnpm typecheck` clean; `pnpm lint` 0
+errors (1 pre-existing unrelated warning); `pnpm test` 185/185;
+`pnpm test:e2e` 58/58; `pnpm build` clean.
+
+### Relation to the production symptom
+
+This is the first mechanism found on this branch that actually produces
+"signed-in browser bounced to `/sign-in` with the server seeing no
+session" in the real code, rather than being ruled out. It fires
+whenever a session-gated navigation races a token refresh — guaranteed
+at every token-expiry boundary, and on *every* navigation if the
+project's JWT expiry is at or below the SDK's 90-second refresh margin.
+That dashboard setting (Authentication → Sessions → JWT expiry) is still
+worth checking, and remains the one thing this environment cannot see.

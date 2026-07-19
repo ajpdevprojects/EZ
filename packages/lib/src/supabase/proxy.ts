@@ -21,7 +21,7 @@ export async function updateSession(request: NextRequest) {
   // Diagnostic only — names and value lengths, never raw token values.
   console.error("[proxy updateSession] cookies on incoming request", {
     path: request.nextUrl.pathname,
-    names: request.cookies.getAll().map((c) => `${c.name} (${c.value.length}b)`),
+    names: request.cookies.getAll().map((c) => `${c.name} (${c.value?.length ?? 0}b)`),
   });
 
   const supabase = createServerClient(env.url, env.anonKey, {
@@ -34,6 +34,26 @@ export async function updateSession(request: NextRequest) {
           path: request.nextUrl.pathname,
           names: cookiesToSet.map((c) => c.name),
         });
+        // A setAll consisting solely of deletions is the SDK wiping the whole
+        // session, which in middleware only ever happens because getUser()'s
+        // token refresh failed. Refresh tokens are single-use, so parallel
+        // requests (Next prefetches every visible link) race for the same
+        // token; the losers get refresh_token_not_found even though the
+        // winner just rotated the session successfully. Forwarding the
+        // losers' deletions would wipe the winner's fresh cookies from the
+        // browser and sign the user out mid-navigation. Genuinely dead
+        // sessions still end up at /sign-in (no page sees a user) — their
+        // stale cookies are cleaned up by the next sign-in/sign-out, both of
+        // which run in Server Action context, not here.
+        const isPureSessionWipe =
+          cookiesToSet.length > 0 && cookiesToSet.every((cookie) => cookie.value === "");
+        if (isPureSessionWipe) {
+          console.error(
+            "[proxy updateSession] suppressed session-wipe from a failed refresh (likely a lost refresh race with a concurrent request)",
+            { path: request.nextUrl.pathname, names: cookiesToSet.map((c) => c.name) },
+          );
+          return;
+        }
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
